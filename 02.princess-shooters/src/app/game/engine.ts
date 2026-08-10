@@ -14,6 +14,8 @@ import {
   WAVE_ENEMIES,
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
+  PLAYER_WIDTH,
+  PLAYER_HEIGHT,
   PLAYER_SPEED,
   PROJECTILE_SPEED,
   POWERUP_CHANCE,
@@ -25,14 +27,15 @@ export function createInitialState(): GameState {
     player: {
       x: 100,
       y: CANVAS_HEIGHT / 2,
-      width: 60,
-      height: 60,
+      width: PLAYER_WIDTH,
+      height: PLAYER_HEIGHT,
       speed: PLAYER_SPEED,
       princess,
       lives: 3,
       invincibleUntil: 0,
       shieldActive: false,
       shieldUntil: 0,
+      fireAnim: 0,
     },
     projectiles: [],
     enemies: [],
@@ -80,6 +83,7 @@ function saveHighScore(score: number) {
 
 export function shoot(state: GameState): Projectile[] {
   const { player } = state;
+  player.fireAnim = 10;
   const newProjectiles: Projectile[] = [];
 
   const createProjectile = (offsetY: number, angleOffset: number) => ({
@@ -212,6 +216,11 @@ export function updateGameState(
   }
   if (keys.has("ArrowRight") || keys.has("d")) {
     player.x = Math.min(CANVAS_WIDTH / 2, player.x + player.speed * dt);
+  }
+
+  // Fire animation decay
+  if (player.fireAnim > 0) {
+    player.fireAnim = Math.max(0, player.fireAnim - dt);
   }
 
   // Shield expiry

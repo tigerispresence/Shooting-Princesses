@@ -9,6 +9,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🦄",
     description: "Golden sparkles light up the sky!",
+    hairColor: "#F5DEB3",
+    skinColor: "#FDDCB5",
+    dressColor: "#FF69B4",
+    dressAccent: "#FF1493",
+    crownColor: "#FFD700",
+    crownGem: "#FF69B4",
+    hairStyle: "long",
+    mountColors: { body: "#FFFFFF", accent: "#E8D5F5", detail: "#FFD700" },
   },
   {
     name: "Luna",
@@ -18,6 +26,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🐉",
     description: "Icy breath freezes all foes!",
+    hairColor: "#1C1C3A",
+    skinColor: "#F0D5C8",
+    dressColor: "#9B59B6",
+    dressAccent: "#6C3483",
+    crownColor: "#C0C0C0",
+    crownGem: "#00FFFF",
+    hairStyle: "ponytail",
+    mountColors: { body: "#4A0E8F", accent: "#7D3AC1", detail: "#00FFFF" },
   },
   {
     name: "Stella",
@@ -27,6 +43,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🐴",
     description: "Swift wings dance through clouds!",
+    hairColor: "#C19A6B",
+    skinColor: "#F5D6C3",
+    dressColor: "#3498DB",
+    dressAccent: "#2176AE",
+    crownColor: "#C0C0C0",
+    crownGem: "#FF69B4",
+    hairStyle: "braids",
+    mountColors: { body: "#F0F0FF", accent: "#B8C6DB", detail: "#87CEEB" },
   },
   {
     name: "Rose",
@@ -36,6 +60,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🔥",
     description: "Flames of courage burn bright!",
+    hairColor: "#CC2200",
+    skinColor: "#FDDCB5",
+    dressColor: "#E74C3C",
+    dressAccent: "#C0392B",
+    crownColor: "#FFD700",
+    crownGem: "#FF4500",
+    hairStyle: "wavy",
+    mountColors: { body: "#FF4500", accent: "#FF6B35", detail: "#FFD700" },
   },
   {
     name: "Elara",
@@ -45,6 +77,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🦢",
     description: "Graceful feathers cut the wind!",
+    hairColor: "#FAF0BE",
+    skinColor: "#FFE4C9",
+    dressColor: "#F1C40F",
+    dressAccent: "#D4AC0D",
+    crownColor: "#E8E8E8",
+    crownGem: "#FFFFFF",
+    hairStyle: "buns",
+    mountColors: { body: "#FFFFFF", accent: "#F5F5DC", detail: "#FFA500" },
   },
   {
     name: "Ivy",
@@ -54,6 +94,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🐺",
     description: "Forest magic guides every shot!",
+    hairColor: "#2D5A27",
+    skinColor: "#D2B48C",
+    dressColor: "#2ECC71",
+    dressAccent: "#1A9850",
+    crownColor: "#8B4513",
+    crownGem: "#98FB98",
+    hairStyle: "short",
+    mountColors: { body: "#808080", accent: "#A0A0A0", detail: "#2ECC71" },
   },
   {
     name: "Coral",
@@ -63,6 +111,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🐬",
     description: "Ocean waves crash upon enemies!",
+    hairColor: "#40E0D0",
+    skinColor: "#F0D5C8",
+    dressColor: "#1ABC9C",
+    dressAccent: "#16A085",
+    crownColor: "#FFD700",
+    crownGem: "#7DF9FF",
+    hairStyle: "curly",
+    mountColors: { body: "#4682B4", accent: "#87CEEB", detail: "#7DF9FF" },
   },
   {
     name: "Violet",
@@ -72,6 +128,14 @@ export const PRINCESSES: Princess[] = [
     emoji: "👸",
     mountEmoji: "🦋",
     description: "Enchanted dust sparkles everywhere!",
+    hairColor: "#9370DB",
+    skinColor: "#FDDCB5",
+    dressColor: "#8E44AD",
+    dressAccent: "#6C3483",
+    crownColor: "#DA70D6",
+    crownGem: "#FFD700",
+    hairStyle: "twintail",
+    mountColors: { body: "#9370DB", accent: "#DA70D6", detail: "#FFD700" },
   },
 ];
 
@@ -97,6 +161,8 @@ export const WAVE_ENEMIES: EnemyType[][] = [
 
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
+export const PLAYER_WIDTH = 120;
+export const PLAYER_HEIGHT = 120;
 export const PLAYER_SPEED = 5;
 export const PROJECTILE_SPEED = 8;
 export const SPAWN_INTERVAL = 1500;

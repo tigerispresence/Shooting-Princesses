@@ -8,6 +8,7 @@ import {
   PowerUp,
 } from "./types";
 import { ENEMY_CONFIG, CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
+import { drawPrincessSprite } from "./sprites";
 
 export function drawBackground(ctx: CanvasRenderingContext2D, stars: Star[], frame: number) {
   const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
@@ -54,37 +55,29 @@ function drawClouds(ctx: CanvasRenderingContext2D, frame: number) {
 }
 
 export function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, frame: number) {
-  const bobY = Math.sin(frame * 0.08) * 4;
-  const px = player.x;
-  const py = player.y + bobY;
-
-  if (player.shieldActive) {
-    ctx.strokeStyle = `rgba(0, 200, 255, ${0.4 + 0.2 * Math.sin(frame * 0.1)})`;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(px, py, player.width * 0.8, player.height * 0.7, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.lineWidth = 1;
-  }
-
   if (player.invincibleUntil > Date.now() && Math.floor(frame / 4) % 2 === 0) {
     return;
   }
 
-  ctx.font = `${player.height * 0.7}px serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(player.princess.mountEmoji, px, py + 5);
+  if (player.shieldActive) {
+    const bobY = Math.sin(frame * 0.08) * 4;
+    ctx.strokeStyle = `rgba(0, 200, 255, ${0.4 + 0.2 * Math.sin(frame * 0.1)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(player.x, player.y + bobY, player.width * 0.55, player.height * 0.55, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
 
-  ctx.font = `${player.height * 0.45}px serif`;
-  ctx.fillText(player.princess.emoji, px + 2, py - player.height * 0.25);
+  drawPrincessSprite(ctx, player, frame);
 
+  // Trail sparkles behind mount
   ctx.fillStyle = player.princess.sparkleColor;
-  for (let i = 0; i < 3; i++) {
-    const sx = px - player.width * 0.5 - 5 - i * 8;
-    const sy = py + Math.sin(frame * 0.15 + i) * 6;
-    const size = 2 + Math.sin(frame * 0.2 + i * 2) * 1;
-    ctx.globalAlpha = 0.6 - i * 0.15;
+  for (let i = 0; i < 4; i++) {
+    const sx = player.x - player.width * 0.4 - 8 - i * 10;
+    const sy = player.y + Math.sin(frame * 0.15 + i) * 8 + Math.sin(frame * 0.08) * 4;
+    const size = 3 + Math.sin(frame * 0.2 + i * 2) * 1.5;
+    ctx.globalAlpha = 0.5 - i * 0.1;
     ctx.beginPath();
     ctx.arc(sx, sy, size, 0, Math.PI * 2);
     ctx.fill();

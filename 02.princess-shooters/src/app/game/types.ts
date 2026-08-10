@@ -6,6 +6,14 @@ export interface Princess {
   emoji: string;
   mountEmoji: string;
   description: string;
+  hairColor: string;
+  skinColor: string;
+  dressColor: string;
+  dressAccent: string;
+  crownColor: string;
+  crownGem: string;
+  hairStyle: "long" | "ponytail" | "buns" | "short" | "braids" | "wavy" | "curly" | "twintail";
+  mountColors: { body: string; accent: string; detail: string };
 }
 
 export interface Player {
@@ -19,6 +27,7 @@ export interface Player {
   invincibleUntil: number;
   shieldActive: boolean;
   shieldUntil: number;
+  fireAnim: number;
 }
 
 export interface Projectile {

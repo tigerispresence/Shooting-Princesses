@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { PRINCESSES } from "./constants";
+import { useState, useRef, useEffect } from "react";
+import { PRINCESSES, PLAYER_WIDTH, PLAYER_HEIGHT } from "./constants";
+import { drawPrincessSprite } from "./sprites";
+import { Player } from "./types";
 
 interface CharacterSelectProps {
   onSelect: (index: number, customName: string) => void;
@@ -10,8 +12,44 @@ interface CharacterSelectProps {
 export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
   const [selected, setSelected] = useState(0);
   const [customName, setCustomName] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef(0);
+  const animRef = useRef<number>(0);
   const princess = PRINCESSES[selected];
   const displayName = customName.trim() || princess.name;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const draw = () => {
+      frameRef.current++;
+      const frame = frameRef.current;
+      ctx.clearRect(0, 0, 200, 200);
+
+      const previewPlayer: Player = {
+        x: 100,
+        y: 110,
+        width: PLAYER_WIDTH * 1.4,
+        height: PLAYER_HEIGHT * 1.4,
+        speed: 0,
+        princess: PRINCESSES[selected],
+        lives: 3,
+        invincibleUntil: 0,
+        shieldActive: false,
+        shieldUntil: 0,
+        fireAnim: Math.floor(frame / 60) % 3 === 0 ? Math.max(0, 10 - (frame % 60) * 0.5) : 0,
+      };
+
+      drawPrincessSprite(ctx, previewPlayer, frame);
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [selected]);
 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl mx-auto px-4">
@@ -28,11 +66,13 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
       <p className="text-lg sm:text-xl text-yellow-300 mb-6">Fairytale Sky Battle!</p>
 
       {/* Selected character preview */}
-      <div className="flex flex-col items-center mb-6 p-6 rounded-2xl bg-purple-900/40 border-2 border-purple-400/30 min-h-[160px]">
-        <div className="text-6xl sm:text-7xl mb-2 relative">
-          <span className="absolute -top-4 -right-2 text-3xl sm:text-4xl">{princess.emoji}</span>
-          <span>{princess.mountEmoji}</span>
-        </div>
+      <div className="flex flex-col items-center mb-6 p-4 rounded-2xl bg-purple-900/40 border-2 border-purple-400/30">
+        <canvas
+          ref={canvasRef}
+          width={200}
+          height={200}
+          className="mb-2"
+        />
         <h2 className="text-2xl sm:text-3xl font-bold" style={{ color: princess.color }}>
           {displayName}
         </h2>
