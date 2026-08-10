@@ -17,6 +17,7 @@ import {
   drawSuperAttack,
   getSuperShake,
 } from "./renderer";
+import TitleScreen from "./TitleScreen";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
 import { initAudio, playBGM, stopBGM, playSFX, playCharacterShoot, toggleMute, isMuted } from "./audio";
@@ -31,7 +32,7 @@ export default function GameCanvas() {
   const lastSpawnRef = useRef(0);
   const animRef = useRef<number>(0);
   const selectedPrincessRef = useRef(0);
-  const [screen, setScreen] = useState<"select" | "playing">("select");
+  const [screen, setScreen] = useState<"title" | "select" | "playing">("title");
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [muted, setMuted] = useState(false);
   const [superReady, setSuperReady] = useState(false);
@@ -245,6 +246,10 @@ export default function GameCanvas() {
       cancelAnimationFrame(animRef.current);
     };
   }, [screen, handleShoot, handleSuper, startGame, isTouchDevice]);
+
+  if (screen === "title") {
+    return <TitleScreen onStart={() => setScreen("select")} />;
+  }
 
   if (screen === "select") {
     return (
