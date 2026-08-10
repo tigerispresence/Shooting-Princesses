@@ -20,6 +20,7 @@ import {
   PROJECTILE_SPEED,
   POWERUP_CHANCE,
 } from "./constants";
+import { playSFX } from "./audio";
 
 export function createInitialState(): GameState {
   const princess = PRINCESSES[Math.floor(Math.random() * PRINCESSES.length)];
@@ -166,6 +167,7 @@ export function spawnPowerUp(x: number, y: number): PowerUp | null {
 }
 
 export function applyPowerUp(state: GameState, powerUp: PowerUp) {
+  playSFX("powerUp");
   switch (powerUp.type) {
     case "heart":
       state.player.lives = Math.min(state.player.lives + 1, 5);
@@ -173,6 +175,7 @@ export function applyPowerUp(state: GameState, powerUp: PowerUp) {
     case "shield":
       state.player.shieldActive = true;
       state.player.shieldUntil = Date.now() + 8000;
+      playSFX("shieldActivate");
       break;
     case "rapidFire":
       state.rapidFireUntil = Date.now() + 6000;
@@ -285,11 +288,13 @@ export function updateGameState(
         state.projectiles.splice(i, 1);
         enemy.health--;
         newParticles.push(...createExplosionParticles(proj.x, proj.y, proj.color));
+        playSFX("enemyHit");
 
         if (enemy.health <= 0) {
           const config = ENEMY_CONFIG[enemy.type];
           state.score += config.points * state.wave;
           newParticles.push(...createExplosionParticles(enemy.x, enemy.y, "#FFD700"));
+          playSFX("enemyDefeat");
           const pu = spawnPowerUp(enemy.x, enemy.y);
           if (pu) newPowerUps.push(pu);
           state.enemies.splice(j, 1);
@@ -311,11 +316,13 @@ export function updateGameState(
           state.particles.push(...createExplosionParticles(enemy.x, enemy.y, "#00FFFF"));
           state.enemies.splice(i, 1);
           state.score += 5;
+          playSFX("enemyDefeat");
         } else {
           player.lives--;
           player.invincibleUntil = Date.now() + 2000;
           state.particles.push(...createExplosionParticles(player.x, player.y, "#FF6B6B"));
           state.enemies.splice(i, 1);
+          playSFX("playerHit");
 
           if (player.lives <= 0) {
             state.gameOver = true;
@@ -356,6 +363,7 @@ export function updateGameState(
     state.enemiesSpawned = 0;
     state.waveTransition = true;
     state.waveTransitionTimer = 2000;
+    playSFX("waveComplete");
   }
 
   return state;

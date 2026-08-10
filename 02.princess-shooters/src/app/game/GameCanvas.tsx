@@ -17,6 +17,7 @@ import {
 } from "./renderer";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
+import { initAudio, playBGM, stopBGM, playSFX, toggleMute, isMuted } from "./audio";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +31,9 @@ export default function GameCanvas() {
   const selectedPrincessRef = useRef(0);
   const [screen, setScreen] = useState<"select" | "playing">("select");
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const prevWaveRef = useRef(1);
+  const gameOverSoundRef = useRef(false);
 
   useEffect(() => {
     setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
@@ -48,6 +52,11 @@ export default function GameCanvas() {
     stateRef.current = state;
     lastSpawnRef.current = 0;
     lastTimeRef.current = 0;
+    prevWaveRef.current = 1;
+    gameOverSoundRef.current = false;
+    initAudio();
+    playBGM(1);
+    playSFX("battleCry");
     setScreen("playing");
   }, []);
 
@@ -62,6 +71,7 @@ export default function GameCanvas() {
 
     const newProjectiles = shoot(state);
     state.projectiles.push(...newProjectiles);
+    playSFX("shoot");
   }, []);
 
   const handleTouchMove = useCallback((dx: number, dy: number) => {
@@ -139,6 +149,17 @@ export default function GameCanvas() {
 
       updateGameState(state, keysRef.current, deltaTime);
 
+      if (state.wave !== prevWaveRef.current) {
+        prevWaveRef.current = state.wave;
+        playBGM(state.wave);
+      }
+
+      if (state.gameOver && !gameOverSoundRef.current) {
+        gameOverSoundRef.current = true;
+        stopBGM();
+        playSFX("gameOver");
+      }
+
       if (keysRef.current.has(" ") && state.started && !state.gameOver) {
         handleShoot();
       }
@@ -211,15 +232,24 @@ export default function GameCanvas() {
         className="rounded-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 w-full max-w-4xl"
         style={{ touchAction: "none" }}
       />
-      <button
-        onClick={() => {
-          cancelAnimationFrame(animRef.current);
-          setScreen("select");
-        }}
-        className="text-purple-400/60 text-xs hover:text-purple-300 transition-colors cursor-pointer"
-      >
-        Back to Character Select
-      </button>
+      <div className="flex gap-4 items-center">
+        <button
+          onClick={() => {
+            cancelAnimationFrame(animRef.current);
+            stopBGM();
+            setScreen("select");
+          }}
+          className="text-purple-400/60 text-xs hover:text-purple-300 transition-colors cursor-pointer"
+        >
+          Back to Character Select
+        </button>
+        <button
+          onClick={() => setMuted(toggleMute())}
+          className="text-purple-400/60 text-xs hover:text-purple-300 transition-colors cursor-pointer"
+        >
+          {muted ? "🔇 Unmute" : "🔊 Sound"}
+        </button>
+      </div>
       <TouchControls
         onMove={handleTouchMove}
         onShoot={handleShoot}
