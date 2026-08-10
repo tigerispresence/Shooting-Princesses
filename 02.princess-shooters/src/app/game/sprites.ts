@@ -1,4 +1,4 @@
-import { Princess, Player } from "./types";
+import { Princess, Player, EnemyType } from "./types";
 
 export function drawPrincessSprite(
   ctx: CanvasRenderingContext2D,
@@ -1019,4 +1019,586 @@ function drawCrown(ctx: CanvasRenderingContext2D, p: Princess) {
   ctx.beginPath();
   ctx.arc(0.5, -31.5, 0.7, 0, Math.PI * 2);
   ctx.fill();
+}
+
+export function drawEnemySprite(
+  ctx: CanvasRenderingContext2D,
+  type: EnemyType,
+  x: number,
+  y: number,
+  size: number,
+  frame: number
+): void {
+  const s = size / 50;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+
+  switch (type) {
+    case "goblin": drawGoblinEnemy(ctx, frame); break;
+    case "bat": drawBatEnemy(ctx, frame); break;
+    case "troll": drawTrollEnemy(ctx, frame); break;
+    case "darkFairy": drawDarkFairyEnemy(ctx, frame); break;
+    case "dragon": drawDragonEnemy(ctx, frame); break;
+  }
+
+  ctx.restore();
+}
+
+function drawGoblinEnemy(ctx: CanvasRenderingContext2D, frame: number) {
+  const bob = Math.sin(frame * 0.09) * 3;
+  const earWiggle = Math.sin(frame * 0.15) * 4;
+  ctx.save();
+  ctx.translate(0, bob);
+
+  ctx.fillStyle = "#6B9B37";
+  ctx.beginPath();
+  ctx.moveTo(-14, -4);
+  ctx.quadraticCurveTo(-26, -8 + earWiggle, -22, 2 + earWiggle);
+  ctx.quadraticCurveTo(-16, 0, -13, 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(14, -4);
+  ctx.quadraticCurveTo(26, -8 - earWiggle, 22, 2 - earWiggle);
+  ctx.quadraticCurveTo(16, 0, 13, 2);
+  ctx.fill();
+  ctx.fillStyle = "#F48FB1";
+  ctx.beginPath();
+  ctx.ellipse(-19, -2 + earWiggle, 3, 4, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(19, -2 - earWiggle, 3, 4, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#7CB342";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 14, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#AED581";
+  ctx.beginPath();
+  ctx.ellipse(0, 13, 8, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#7CB342";
+  ctx.lineWidth = 5;
+  ctx.lineCap = "round";
+  const armSwing = Math.sin(frame * 0.15) * 6;
+  ctx.beginPath();
+  ctx.moveTo(-11, 6);
+  ctx.quadraticCurveTo(-18, 10 + armSwing * 0.3, -16, 16 + armSwing);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(11, 6);
+  ctx.quadraticCurveTo(18, 10 - armSwing * 0.3, 16, 16 - armSwing);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#8BC34A";
+  ctx.beginPath();
+  ctx.arc(0, -8, 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#4F7A2B";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -13);
+  ctx.lineTo(-3, -11);
+  ctx.moveTo(9, -13);
+  ctx.lineTo(3, -11);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#FFEB3B";
+  ctx.beginPath();
+  ctx.ellipse(-5, -8, 3, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(5, -8, 3, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#222";
+  ctx.beginPath();
+  ctx.arc(-4.5, -7.5, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(5.5, -7.5, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.arc(-4, -8.3, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(6, -8.3, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#6B9B37";
+  ctx.beginPath();
+  ctx.arc(0, -4, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#3E2723";
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.arc(0, -3, 6, 0.15, Math.PI - 0.15);
+  ctx.stroke();
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.moveTo(3, 1.5);
+  ctx.lineTo(4.5, 4);
+  ctx.lineTo(2, 2);
+  ctx.fill();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#4F7A2B";
+  ctx.beginPath();
+  ctx.moveTo(-2, -19);
+  ctx.quadraticCurveTo(0, -25, 2, -19);
+  ctx.quadraticCurveTo(0, -21, -2, -19);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawBatEnemy(ctx: CanvasRenderingContext2D, frame: number) {
+  const bob = Math.sin(frame * 0.1) * 3;
+  const wingFlap = Math.sin(frame * 0.25) * 14;
+  ctx.save();
+  ctx.translate(0, bob);
+
+  ctx.fillStyle = "#7E57C2";
+  ctx.beginPath();
+  ctx.moveTo(-8, 2);
+  ctx.quadraticCurveTo(-22, -6 + wingFlap * 0.4, -26, 4 + wingFlap);
+  ctx.quadraticCurveTo(-18, 6 + wingFlap * 0.3, -14, 2);
+  ctx.quadraticCurveTo(-16, 10 + wingFlap * 0.5, -10, 8);
+  ctx.quadraticCurveTo(-10, 4, -8, 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(8, 2);
+  ctx.quadraticCurveTo(22, -6 - wingFlap * 0.4, 26, 4 - wingFlap);
+  ctx.quadraticCurveTo(18, 6 - wingFlap * 0.3, 14, 2);
+  ctx.quadraticCurveTo(16, 10 - wingFlap * 0.5, 10, 8);
+  ctx.quadraticCurveTo(10, 4, 8, 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#9575CD";
+  ctx.beginPath();
+  ctx.ellipse(0, 6, 11, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#D1C4E9";
+  ctx.beginPath();
+  ctx.ellipse(0, 9, 6, 5.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#7E57C2";
+  ctx.beginPath();
+  ctx.moveTo(-7, -10);
+  ctx.quadraticCurveTo(-11, -22, -4, -16);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(7, -10);
+  ctx.quadraticCurveTo(11, -22, 4, -16);
+  ctx.fill();
+  ctx.fillStyle = "#D1C4E9";
+  ctx.beginPath();
+  ctx.moveTo(-6.5, -11);
+  ctx.quadraticCurveTo(-9, -19, -4.5, -15);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(6.5, -11);
+  ctx.quadraticCurveTo(9, -19, 4.5, -15);
+  ctx.fill();
+
+  ctx.fillStyle = "#9575CD";
+  ctx.beginPath();
+  ctx.arc(0, -6, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#222";
+  ctx.beginPath();
+  ctx.arc(-3.5, -6, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(3.5, -6, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.arc(-2.9, -6.7, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(4.1, -6.7, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.moveTo(-2, -1);
+  ctx.lineTo(-1, 2);
+  ctx.lineTo(-3, 0.5);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(2, -1);
+  ctx.lineTo(1, 2);
+  ctx.lineTo(3, 0.5);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawTrollEnemy(ctx: CanvasRenderingContext2D, frame: number) {
+  const bob = Math.sin(frame * 0.06) * 4;
+  const clubSwing = Math.sin(frame * 0.1) * 8;
+  ctx.save();
+  ctx.translate(0, bob);
+
+  ctx.save();
+  ctx.translate(20, 6);
+  ctx.rotate((clubSwing * Math.PI) / 180);
+  ctx.fillStyle = "#8D6E63";
+  ctx.fillRect(-2.5, -2, 5, 22);
+  ctx.fillStyle = "#6D4C41";
+  ctx.beginPath();
+  ctx.ellipse(0, -6, 6, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#5D4037";
+  for (const [nx, ny] of [[-3, -9], [3, -3], [-2, -2]] as const) {
+    ctx.beginPath();
+    ctx.arc(nx, ny, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "#78909C";
+  ctx.beginPath();
+  ctx.ellipse(0, 12, 20, 17, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#B0BEC5";
+  ctx.beginPath();
+  ctx.ellipse(0, 16, 11, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#78909C";
+  ctx.lineWidth = 8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-17, 6);
+  ctx.quadraticCurveTo(-24, 12, -22, 20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(17, 6);
+  ctx.quadraticCurveTo(22, 8, 20, 16);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#607D8B";
+  ctx.fillRect(-13, 26, 9, 8);
+  ctx.fillRect(4, 26, 9, 8);
+
+  ctx.fillStyle = "#90A4AE";
+  ctx.beginPath();
+  ctx.arc(0, -10, 15, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#78909C";
+  ctx.beginPath();
+  ctx.ellipse(-14, -10, 3, 5, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(14, -10, 3, 5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.ellipse(-6, -11, 3.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(6, -11, 3.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#333";
+  ctx.beginPath();
+  ctx.arc(-6, -9, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(6, -9, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.arc(-5.4, -9.6, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(6.6, -9.6, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#78909C";
+  ctx.beginPath();
+  ctx.arc(0, -4, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFF9C4";
+  ctx.beginPath();
+  ctx.moveTo(-3, 1);
+  ctx.lineTo(-4, 5);
+  ctx.lineTo(-1.5, 1.5);
+  ctx.fill();
+
+  ctx.strokeStyle = "#37474F";
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.arc(0, -2, 6, 0.2, Math.PI - 0.2);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#546E7A";
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * 4, -24);
+    ctx.quadraticCurveTo(i * 4 + 1, -30, i * 4 + 2, -24);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawDarkFairyEnemy(ctx: CanvasRenderingContext2D, frame: number) {
+  const bob = Math.sin(frame * 0.1) * 4;
+  const wingFlap = Math.sin(frame * 0.3) * 6;
+  const glow = 0.5 + 0.5 * Math.sin(frame * 0.15);
+  ctx.save();
+  ctx.translate(0, bob);
+
+  ctx.fillStyle = `rgba(186, 104, 200, ${0.15 + glow * 0.15})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(206, 147, 216, ${0.55 + Math.abs(wingFlap) * 0.01})`;
+  ctx.beginPath();
+  ctx.ellipse(-10, -2 + wingFlap * 0.3, 9, 13, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(10, -2 - wingFlap * 0.3, 9, 13, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.beginPath();
+  ctx.arc(-10, -4 + wingFlap * 0.3, 1.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(10, -4 - wingFlap * 0.3, 1.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#8E24AA";
+  ctx.beginPath();
+  ctx.moveTo(-5, 2);
+  ctx.quadraticCurveTo(0, 6, 5, 2);
+  ctx.lineTo(3, 10);
+  ctx.quadraticCurveTo(0, 12, -3, 10);
+  ctx.fill();
+
+  ctx.fillStyle = "#CE93D8";
+  ctx.beginPath();
+  ctx.arc(0, -4, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#4A148C";
+  ctx.beginPath();
+  ctx.arc(0, -6, 8.5, Math.PI, 0);
+  ctx.fill();
+  for (let i = 0; i < 3; i++) {
+    const hx = -5 + i * 5;
+    ctx.beginPath();
+    ctx.moveTo(hx, -12);
+    ctx.lineTo(hx + (i - 1) * 2, -18);
+    ctx.lineTo(hx + 2.5, -12);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "#4A148C";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-5, -6);
+  ctx.lineTo(-2, -5);
+  ctx.moveTo(5, -6);
+  ctx.lineTo(2, -5);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#4A148C";
+  ctx.beginPath();
+  ctx.ellipse(-2.8, -3.5, 1.6, 1.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(2.8, -3.5, 1.6, 1.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.arc(-2.4, -4, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(3.2, -4, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#6A1B9A";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 1, 2, Math.PI + 0.4, Math.PI * 2 - 0.4, true);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#CE93D8";
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-5, 3);
+  ctx.lineTo(4, 5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(5, 3);
+  ctx.lineTo(-4, 6);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = `rgba(255,255,255,${0.4 + glow * 0.4})`;
+  for (let i = 0; i < 3; i++) {
+    const angle = frame * 0.05 + (i * Math.PI * 2) / 3;
+    const sx = Math.cos(angle) * 15;
+    const sy = Math.sin(angle) * 15 - 2;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawDragonEnemy(ctx: CanvasRenderingContext2D, frame: number) {
+  const bob = Math.sin(frame * 0.07) * 4;
+  const wingFlap = Math.sin(frame * 0.18) * 8;
+  ctx.save();
+  ctx.translate(0, bob);
+
+  ctx.strokeStyle = "#E64A19";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  const tailWave = Math.sin(frame * 0.1) * 6;
+  ctx.beginPath();
+  ctx.moveTo(-16, 14);
+  ctx.quadraticCurveTo(-28, 16 + tailWave, -30, 8 + tailWave);
+  ctx.stroke();
+  ctx.fillStyle = "#FFB74D";
+  ctx.beginPath();
+  ctx.moveTo(-30, 4 + tailWave);
+  ctx.lineTo(-35, 8 + tailWave);
+  ctx.lineTo(-29, 12 + tailWave);
+  ctx.fill();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = "#FFAB91";
+  ctx.beginPath();
+  ctx.moveTo(-6, 2);
+  ctx.quadraticCurveTo(-20, -4 + wingFlap, -14, 8 + wingFlap * 0.5);
+  ctx.quadraticCurveTo(-10, 6, -6, 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(6, 2);
+  ctx.quadraticCurveTo(20, -4 - wingFlap, 14, 8 - wingFlap * 0.5);
+  ctx.quadraticCurveTo(10, 6, 6, 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#F4511E";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 16, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFCC80";
+  ctx.beginPath();
+  ctx.ellipse(0, 14, 9, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFB300";
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-6 + i * 6, -2);
+    ctx.lineTo(-4 + i * 6, -8);
+    ctx.lineTo(-2 + i * 6, -2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "#F4511E";
+  ctx.fillRect(-11, 20, 6, 7);
+  ctx.fillRect(5, 20, 6, 7);
+
+  ctx.fillStyle = "#FB8C00";
+  ctx.beginPath();
+  ctx.arc(0, -10, 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFB74D";
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 6, 4.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFD54F";
+  ctx.beginPath();
+  ctx.moveTo(-6, -19);
+  ctx.lineTo(-8, -25);
+  ctx.lineTo(-4, -19);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(6, -19);
+  ctx.lineTo(8, -25);
+  ctx.lineTo(4, -19);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.ellipse(-5, -12, 3, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(5, -12, 3, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#2E7D32";
+  ctx.beginPath();
+  ctx.arc(-4.5, -11.5, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(5.5, -11.5, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFF";
+  ctx.beginPath();
+  ctx.arc(-4, -12.2, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(6, -12.2, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#D84315";
+  ctx.beginPath();
+  ctx.arc(-2.5, -3, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(2.5, -3, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#BF360C";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, -3, 3.5, 0.2, Math.PI - 0.2);
+  ctx.stroke();
+
+  const puffCycle = frame % 60;
+  for (let i = 0; i < 2; i++) {
+    const p = (puffCycle + i * 30) % 60;
+    if (p < 40) {
+      const py = -18 - p * 0.6;
+      const px = (i === 0 ? -2.5 : 2.5) + Math.sin(frame * 0.1 + i) * 2;
+      const alpha = 0.5 * (1 - p / 40);
+      const r = 1.5 + p * 0.08;
+      ctx.fillStyle = `rgba(210,210,210,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
 }

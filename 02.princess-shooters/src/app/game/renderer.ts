@@ -8,7 +8,8 @@ import {
   PowerUp,
 } from "./types";
 import { ENEMY_CONFIG, CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
-import { drawPrincessSprite } from "./sprites";
+import { drawPrincessSprite, drawEnemySprite } from "./sprites";
+import { STORY } from "./story";
 
 export function drawBackground(ctx: CanvasRenderingContext2D, stars: Star[], frame: number) {
   const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
@@ -135,18 +136,14 @@ function drawSparkle(
 
 export function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, frame: number) {
   const config = ENEMY_CONFIG[enemy.type];
-  const bobY = Math.sin(frame * 0.06 + enemy.sinOffset) * 5;
 
-  ctx.font = `${config.size}px serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(config.emoji, enemy.x, enemy.y + bobY);
+  drawEnemySprite(ctx, enemy.type, enemy.x, enemy.y, config.size, frame + enemy.sinOffset * 10);
 
   if (enemy.health < enemy.maxHealth) {
     const barWidth = enemy.width * 0.8;
     const barHeight = 4;
     const barX = enemy.x - barWidth / 2;
-    const barY = enemy.y - enemy.height / 2 - 8 + bobY;
+    const barY = enemy.y - enemy.height / 2 - 8;
 
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(barX, barY, barWidth, barHeight);
@@ -228,18 +225,24 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
 }
 
 export function drawWaveTransition(ctx: CanvasRenderingContext2D, wave: number, frame: number) {
-  ctx.fillStyle = `rgba(0, 0, 0, ${0.3 + 0.1 * Math.sin(frame * 0.1)})`;
-  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 50, CANVAS_WIDTH, 100);
+  ctx.fillStyle = `rgba(0, 0, 0, ${0.4 + 0.1 * Math.sin(frame * 0.1)})`;
+  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 70, CANVAS_WIDTH, 140);
 
-  ctx.font = "bold 36px Arial";
+  const storyWave = STORY.waves[Math.min(wave - 1, STORY.waves.length - 1)];
+
+  ctx.font = "bold 32px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = `hsl(${(frame * 3) % 360}, 80%, 70%)`;
-  ctx.fillText(`Wave ${wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 10);
+  ctx.fillText(storyWave.title, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
 
-  ctx.font = "18px Arial";
-  ctx.fillStyle = "#cccccc";
-  ctx.fillText("Get ready!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 25);
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#FFD700";
+  ctx.fillText(storyWave.introDialogue, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 10);
+
+  ctx.font = "14px Arial";
+  ctx.fillStyle = "#B8A9E8";
+  ctx.fillText(`Wave ${wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 40);
 }
 
 export function drawGameOver(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {
@@ -267,40 +270,26 @@ export function drawGameOver(ctx: CanvasRenderingContext2D, state: GameState, fr
   ctx.fillText("Press SPACE or Click to play again", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80);
 }
 
-export function drawStartScreen(ctx: CanvasRenderingContext2D, frame: number) {
-  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+export function drawBattleCry(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {
+  const name = state.player.princess.name;
+  const quote = STORY.characterQuotes[name];
+  if (!quote) return;
 
-  ctx.font = "bold 42px Arial";
+  const elapsed = Date.now() - state.startedAt;
+  if (elapsed > 3000) return;
+
+  const alpha = Math.max(0, 1 - elapsed / 3000);
+  const y = CANVAS_HEIGHT / 2 - 40 - elapsed * 0.02;
+
+  ctx.font = "bold 20px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = `hsl(${(frame * 2) % 360}, 80%, 75%)`;
-  ctx.fillText("Princess Shooters", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100);
+  ctx.fillStyle = state.player.princess.color;
+  ctx.globalAlpha = alpha;
+  ctx.fillText(`"${quote}"`, CANVAS_WIDTH / 2, y);
 
-  ctx.font = "22px Arial";
+  ctx.font = "14px Arial";
   ctx.fillStyle = "#FFD700";
-  ctx.fillText("Fairytale Sky Battle!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 55);
-
-  ctx.font = "16px Arial";
-  ctx.fillStyle = "#B8A9E8";
-  const instructions = [
-    "Arrow Keys or WASD to move",
-    "SPACE or Click to shoot sparkles",
-    "Collect power-ups for bonuses!",
-  ];
-  instructions.forEach((text, i) => {
-    ctx.fillText(text, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + i * 28);
-  });
-
-  ctx.font = "20px Arial";
-  ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + 0.5 * Math.sin(frame * 0.08)})`;
-  ctx.fillText("Press SPACE or Click to start", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 120);
-
-  const emojis = ["🦄", "🐉", "👸", "🦅"];
-  emojis.forEach((e, i) => {
-    const x = CANVAS_WIDTH / 2 - 90 + i * 60;
-    const y = CANVAS_HEIGHT / 2 + 165 + Math.sin(frame * 0.06 + i) * 8;
-    ctx.font = "32px serif";
-    ctx.fillText(e, x, y);
-  });
+  ctx.fillText(`— ${name}`, CANVAS_WIDTH / 2, y + 25);
+  ctx.globalAlpha = 1;
 }

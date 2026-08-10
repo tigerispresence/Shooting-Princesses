@@ -13,6 +13,7 @@ import {
   drawHUD,
   drawGameOver,
   drawWaveTransition,
+  drawBattleCry,
 } from "./renderer";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
@@ -165,6 +166,7 @@ export default function GameCanvas() {
       drawPlayer(ctx, state.player, frame);
       drawHUD(ctx, state);
 
+      drawBattleCry(ctx, state, frame);
       if (state.waveTransition) drawWaveTransition(ctx, state.wave, frame);
       if (state.gameOver) drawGameOver(ctx, state, frame);
 

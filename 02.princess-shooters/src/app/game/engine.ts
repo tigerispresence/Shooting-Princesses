@@ -54,6 +54,7 @@ export function createInitialState(): GameState {
     highScore: loadHighScore(),
     waveTransition: false,
     waveTransitionTimer: 0,
+    startedAt: Date.now(),
   };
 }
 

@@ -101,4 +101,5 @@ export interface GameState {
   highScore: number;
   waveTransition: boolean;
   waveTransitionTimer: number;
+  startedAt: number;
 }
