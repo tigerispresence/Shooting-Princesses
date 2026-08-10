@@ -5,10 +5,12 @@ import { useRef, useEffect, useCallback } from "react";
 interface TouchControlsProps {
   onMove: (dx: number, dy: number) => void;
   onShoot: () => void;
+  onSuper?: () => void;
+  superReady?: boolean;
   visible: boolean;
 }
 
-export default function TouchControls({ onMove, onShoot, visible }: TouchControlsProps) {
+export default function TouchControls({ onMove, onShoot, onSuper, superReady, visible }: TouchControlsProps) {
   const joystickRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
   const joystickTouchId = useRef<number | null>(null);
@@ -154,19 +156,37 @@ export default function TouchControls({ onMove, onShoot, visible }: TouchControl
         />
       </div>
 
-      {/* Fire button - right side */}
-      <div
-        className="w-[90px] h-[90px] sm:w-[100px] sm:h-[100px] rounded-full flex items-center justify-center pointer-events-auto active:scale-90 transition-transform"
-        style={{
-          background: "radial-gradient(circle, rgba(234,179,8,0.6) 0%, rgba(234,88,12,0.4) 100%)",
-          border: "3px solid rgba(255,215,0,0.6)",
-          boxShadow: "0 0 25px rgba(255,215,0,0.3)",
-        }}
-        onTouchStart={handleFireTouchStart}
-        onTouchEnd={handleFireTouchEnd}
-        onTouchCancel={handleFireTouchEnd}
-      >
-        <span className="text-3xl sm:text-4xl select-none">&#10022;</span>
+      {/* Right side buttons */}
+      <div className="flex flex-col items-center gap-3">
+        {/* Super button */}
+        {superReady && onSuper && (
+          <div
+            className="w-[60px] h-[60px] sm:w-[70px] sm:h-[70px] rounded-full flex items-center justify-center pointer-events-auto active:scale-90 transition-transform"
+            style={{
+              background: "radial-gradient(circle, rgba(255,100,255,0.7) 0%, rgba(147,51,234,0.5) 100%)",
+              border: "3px solid rgba(255,200,255,0.8)",
+              boxShadow: "0 0 25px rgba(255,100,255,0.5)",
+              animation: "pulse 1s infinite",
+            }}
+            onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); onSuper(); }}
+          >
+            <span className="text-xl sm:text-2xl select-none font-bold text-white">S</span>
+          </div>
+        )}
+        {/* Fire button */}
+        <div
+          className="w-[90px] h-[90px] sm:w-[100px] sm:h-[100px] rounded-full flex items-center justify-center pointer-events-auto active:scale-90 transition-transform"
+          style={{
+            background: "radial-gradient(circle, rgba(234,179,8,0.6) 0%, rgba(234,88,12,0.4) 100%)",
+            border: "3px solid rgba(255,215,0,0.6)",
+            boxShadow: "0 0 25px rgba(255,215,0,0.3)",
+          }}
+          onTouchStart={handleFireTouchStart}
+          onTouchEnd={handleFireTouchEnd}
+          onTouchCancel={handleFireTouchEnd}
+        >
+          <span className="text-3xl sm:text-4xl select-none">&#10022;</span>
+        </div>
       </div>
     </div>
   );

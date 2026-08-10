@@ -102,4 +102,9 @@ export interface GameState {
   waveTransition: boolean;
   waveTransitionTimer: number;
   startedAt: number;
+  superCharge: number;
+  superReady: boolean;
+  superActive: boolean;
+  superActiveUntil: number;
+  superAnimFrame: number;
 }

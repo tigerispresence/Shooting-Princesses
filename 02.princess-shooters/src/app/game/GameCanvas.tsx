@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import { CANVAS_WIDTH, CANVAS_HEIGHT, PRINCESSES, PLAYER_SPEED } from "./constants";
-import { createInitialState, shoot, spawnEnemy, updateGameState } from "./engine";
+import { createInitialState, shoot, spawnEnemy, updateGameState, activateSuper } from "./engine";
 import {
   drawBackground,
   drawPlayer,
@@ -14,10 +14,11 @@ import {
   drawGameOver,
   drawWaveTransition,
   drawBattleCry,
+  drawSuperAttack,
 } from "./renderer";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
-import { initAudio, playBGM, stopBGM, playSFX, toggleMute, isMuted } from "./audio";
+import { initAudio, playBGM, stopBGM, playSFX, playCharacterShoot, toggleMute, isMuted } from "./audio";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,6 +33,7 @@ export default function GameCanvas() {
   const [screen, setScreen] = useState<"select" | "playing">("select");
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [superReady, setSuperReady] = useState(false);
   const prevWaveRef = useRef(1);
   const gameOverSoundRef = useRef(false);
 
@@ -71,7 +73,15 @@ export default function GameCanvas() {
 
     const newProjectiles = shoot(state);
     state.projectiles.push(...newProjectiles);
-    playSFX("shoot");
+    playCharacterShoot(state.player.princess.name);
+  }, []);
+
+  const handleSuper = useCallback(() => {
+    const state = stateRef.current;
+    if (!state.started || state.gameOver || state.paused || !state.superReady) return;
+    const particles = activateSuper(state);
+    state.particles.push(...particles);
+    playSFX("superAttack");
   }, []);
 
   const handleTouchMove = useCallback((dx: number, dy: number) => {
@@ -113,6 +123,10 @@ export default function GameCanvas() {
           setScreen("select");
           return;
         }
+      }
+
+      if (e.key === "e" || e.key === "E") {
+        handleSuper();
       }
 
       if (e.key === "p" || e.key === "P") {
@@ -160,6 +174,10 @@ export default function GameCanvas() {
         playSFX("gameOver");
       }
 
+      if (state.superReady !== superReady) {
+        setSuperReady(state.superReady);
+      }
+
       if (keysRef.current.has(" ") && state.started && !state.gameOver) {
         handleShoot();
       }
@@ -187,6 +205,7 @@ export default function GameCanvas() {
       drawPlayer(ctx, state.player, frame);
       drawHUD(ctx, state);
 
+      drawSuperAttack(ctx, state, frame);
       drawBattleCry(ctx, state, frame);
       if (state.waveTransition) drawWaveTransition(ctx, state.wave, frame);
       if (state.gameOver) drawGameOver(ctx, state, frame);
@@ -213,7 +232,7 @@ export default function GameCanvas() {
       canvas.removeEventListener("click", handleClick);
       cancelAnimationFrame(animRef.current);
     };
-  }, [screen, handleShoot, startGame, isTouchDevice]);
+  }, [screen, handleShoot, handleSuper, startGame, isTouchDevice]);
 
   if (screen === "select") {
     return (
@@ -253,6 +272,8 @@ export default function GameCanvas() {
       <TouchControls
         onMove={handleTouchMove}
         onShoot={handleShoot}
+        onSuper={handleSuper}
+        superReady={superReady}
         visible={isTouchDevice && screen === "playing"}
       />
     </div>

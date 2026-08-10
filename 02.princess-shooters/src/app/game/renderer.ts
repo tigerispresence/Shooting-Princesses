@@ -222,6 +222,48 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.textAlign = "left";
     ctx.fillText("✨ TRIPLE SHOT", 15, state.rapidFireUntil > Date.now() ? 72 : 55);
   }
+
+  // Super charge meter
+  const meterX = CANVAS_WIDTH / 2 - 60;
+  const meterY = CANVAS_HEIGHT - 22;
+  const meterW = 120;
+  const meterH = 10;
+  const charge = Math.min(state.superCharge, 10);
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.fillRect(meterX - 1, meterY - 1, meterW + 2, meterH + 2);
+
+  if (state.superReady) {
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.008);
+    ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+    ctx.fillRect(meterX, meterY, meterW, meterH);
+    ctx.font = "bold 10px Arial";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("SUPER READY! [E]", CANVAS_WIDTH / 2, meterY + meterH / 2);
+  } else if (state.superActive) {
+    const flash = 0.5 + 0.5 * Math.sin(Date.now() * 0.015);
+    ctx.fillStyle = `rgba(255, 100, 255, ${flash})`;
+    ctx.fillRect(meterX, meterY, meterW, meterH);
+    ctx.font = "bold 10px Arial";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("SUPER ACTIVE!", CANVAS_WIDTH / 2, meterY + meterH / 2);
+  } else {
+    const pct = charge / 10;
+    const grad = ctx.createLinearGradient(meterX, 0, meterX + meterW * pct, 0);
+    grad.addColorStop(0, state.player.princess.color);
+    grad.addColorStop(1, state.player.princess.sparkleColor);
+    ctx.fillStyle = grad;
+    ctx.fillRect(meterX, meterY, meterW * pct, meterH);
+    ctx.font = "9px Arial";
+    ctx.fillStyle = "#CCCCCC";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${charge}/10`, CANVAS_WIDTH / 2, meterY + meterH / 2);
+  }
 }
 
 export function drawWaveTransition(ctx: CanvasRenderingContext2D, wave: number, frame: number) {
@@ -268,6 +310,82 @@ export function drawGameOver(ctx: CanvasRenderingContext2D, state: GameState, fr
   ctx.font = "20px Arial";
   ctx.fillStyle = "#B8A9E8";
   ctx.fillText("Press SPACE or Click to play again", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80);
+}
+
+export function drawSuperAttack(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {
+  if (!state.superActive) return;
+
+  const { player } = state;
+  const f = state.superAnimFrame;
+  const color = player.princess.color;
+  const sparkle = player.princess.sparkleColor;
+  const cx = player.x;
+  const cy = player.y;
+
+  // Expanding shockwave rings
+  for (let i = 0; i < 3; i++) {
+    const ringFrame = f - i * 12;
+    if (ringFrame < 0) continue;
+    const radius = ringFrame * 8;
+    const alpha = Math.max(0, 0.6 - ringFrame * 0.008);
+    ctx.strokeStyle = i % 2 === 0 ? color : sparkle;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 4 - i;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Rotating star burst
+  if (f < 90) {
+    const burstAlpha = Math.max(0, 0.8 - f * 0.009);
+    ctx.globalAlpha = burstAlpha;
+    const numRays = 12;
+    for (let i = 0; i < numRays; i++) {
+      const angle = (Math.PI * 2 * i) / numRays + f * 0.06;
+      const innerR = 30 + f * 2;
+      const outerR = 80 + f * 5;
+      const grad = ctx.createLinearGradient(
+        cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR,
+        cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR
+      );
+      grad.addColorStop(0, sparkle);
+      grad.addColorStop(1, "transparent");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR);
+      ctx.lineTo(cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR);
+      ctx.stroke();
+    }
+  }
+
+  // Screen edge glow
+  const glowAlpha = Math.max(0, 0.3 - f * 0.003);
+  const edgeGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, CANVAS_WIDTH);
+  edgeGrad.addColorStop(0, "transparent");
+  edgeGrad.addColorStop(0.6, "transparent");
+  edgeGrad.addColorStop(1, color);
+  ctx.globalAlpha = glowAlpha;
+  ctx.fillStyle = edgeGrad;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  // Floating sparkle symbols around the princess
+  ctx.globalAlpha = Math.max(0, 0.9 - f * 0.005);
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = sparkle;
+  for (let i = 0; i < 8; i++) {
+    const orbitAngle = (Math.PI * 2 * i) / 8 + f * 0.04;
+    const orbitR = 50 + Math.sin(f * 0.1 + i) * 15;
+    const sx = cx + Math.cos(orbitAngle) * orbitR;
+    const sy = cy + Math.sin(orbitAngle) * orbitR;
+    ctx.fillText("✦", sx, sy);
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1;
 }
 
 export function drawBattleCry(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {

@@ -21,7 +21,9 @@ export type SFXType =
   | "waveComplete"
   | "gameOver"
   | "shieldActivate"
-  | "battleCry";
+  | "battleCry"
+  | "superAttack"
+  | "superReady";
 
 // ---------------------------------------------------------------------------
 // Core Web Audio state
@@ -597,6 +599,273 @@ export function playSFX(type: SFXType): void {
         attack: 0.01,
         dest,
       });
+      break;
+    }
+
+    case "superAttack": {
+      // Low rumble build-up — two detuned triangle waves climbing together.
+      scheduleTone({
+        type: "triangle",
+        startFreq: 55,
+        endFreq: 110,
+        glideTime: 0.35,
+        start: t,
+        duration: 0.4,
+        peak: 0.3,
+        attack: 0.05,
+        dest,
+      });
+      scheduleTone({
+        type: "triangle",
+        startFreq: 82,
+        endFreq: 165,
+        glideTime: 0.35,
+        start: t + 0.02,
+        duration: 0.4,
+        peak: 0.2,
+        attack: 0.05,
+        detune: 5,
+        dest,
+      });
+
+      // Powering-up square arpeggio sweep.
+      const powerNotes = ["C4", "E4", "G4", "C5", "E5", "G5", "C6"];
+      powerNotes.forEach((n, i) => {
+        scheduleTone({
+          type: "square",
+          startFreq: noteFreq(n),
+          start: t + 0.15 + i * 0.055,
+          duration: 0.12,
+          peak: 0.22,
+          attack: 0.005,
+          dest,
+        });
+      });
+
+      // Bright triumphant burst chord.
+      const burstNotes = ["C6", "E6", "G6", "C7"];
+      burstNotes.forEach((n, i) => {
+        scheduleTone({
+          type: "sine",
+          startFreq: noteFreq(n),
+          start: t + 0.55,
+          duration: 0.45,
+          peak: 0.22,
+          attack: 0.01,
+          detune: i * 3,
+          dest,
+        });
+      });
+
+      // Sparkle shimmer tail riding on top of the burst.
+      scheduleTone({
+        type: "sine",
+        startFreq: 2400,
+        endFreq: 3600,
+        glideTime: 0.35,
+        start: t + 0.55,
+        duration: 0.45,
+        peak: 0.08,
+        dest,
+      });
+      break;
+    }
+
+    case "superReady": {
+      // Short "ding-ding!" notification chime signaling the super is charged.
+      const dingNotes = ["E6", "C7"];
+      dingNotes.forEach((n, i) => {
+        scheduleTone({
+          type: "sine",
+          startFreq: noteFreq(n),
+          start: t + i * 0.15,
+          duration: 0.14,
+          peak: 0.2,
+          attack: 0.005,
+          dest,
+        });
+      });
+      break;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Character-specific firing sounds
+// ---------------------------------------------------------------------------
+
+/**
+ * Plays a unique shoot SFX themed to the given princess's mount, e.g. Aurora's
+ * unicorn sparkle vs. Luna's icy dragon crackle. Falls back to the generic
+ * "shoot" SFX for unrecognized names. Every variant stays under 0.15s so
+ * rapid fire doesn't overlap/muddy.
+ */
+export function playCharacterShoot(princessName: string): void {
+  const ctx = ensureAudio();
+  if (!ctx || !sfxGain) return;
+  const dest = sfxGain;
+  const t = ctx.currentTime;
+
+  switch (princessName) {
+    case "Aurora": {
+      // Unicorn — sparkly chime: high twinkling sine tones.
+      const notes = [2200, 2800, 3400];
+      notes.forEach((f, i) => {
+        scheduleTone({
+          type: "sine",
+          startFreq: f,
+          start: t + i * 0.025,
+          duration: 0.05,
+          peak: 0.14,
+          attack: 0.002,
+          dest,
+        });
+      });
+      break;
+    }
+
+    case "Luna": {
+      // Dragon — icy crackle: descending detuned square waves.
+      scheduleTone({
+        type: "square",
+        startFreq: 1100,
+        endFreq: 550,
+        glideTime: 0.09,
+        start: t,
+        duration: 0.1,
+        peak: 0.14,
+        attack: 0.002,
+        detune: -20,
+        dest,
+      });
+      scheduleTone({
+        type: "square",
+        startFreq: 1150,
+        endFreq: 560,
+        glideTime: 0.09,
+        start: t,
+        duration: 0.1,
+        peak: 0.08,
+        attack: 0.002,
+        detune: 20,
+        dest,
+      });
+      break;
+    }
+
+    case "Stella": {
+      // Pegasus — wind whoosh: breathy sine sweep upward.
+      scheduleTone({
+        type: "sine",
+        startFreq: 400,
+        endFreq: 1200,
+        glideTime: 0.11,
+        start: t,
+        duration: 0.12,
+        peak: 0.14,
+        attack: 0.02,
+        dest,
+      });
+      break;
+    }
+
+    case "Rose": {
+      // Phoenix — fire crackle: warm sawtooth burst with a snappy upper layer.
+      scheduleTone({
+        type: "sawtooth",
+        startFreq: 300,
+        endFreq: 220,
+        glideTime: 0.06,
+        start: t,
+        duration: 0.08,
+        peak: 0.16,
+        attack: 0.002,
+        dest,
+      });
+      scheduleTone({
+        type: "sawtooth",
+        startFreq: 900,
+        endFreq: 500,
+        glideTime: 0.04,
+        start: t + 0.01,
+        duration: 0.05,
+        peak: 0.07,
+        attack: 0.001,
+        detune: 30,
+        dest,
+      });
+      break;
+    }
+
+    case "Elara": {
+      // Swan — elegant harp pluck: quick 3-note sine arpeggio.
+      const notes = ["C6", "E6", "G6"];
+      notes.forEach((n, i) => {
+        scheduleTone({
+          type: "sine",
+          startFreq: noteFreq(n),
+          start: t + i * 0.03,
+          duration: 0.06,
+          peak: 0.15,
+          attack: 0.002,
+          dest,
+        });
+      });
+      break;
+    }
+
+    case "Ivy": {
+      // Wolf — nature growl: low triangle with a slight downward pitch bend.
+      scheduleTone({
+        type: "triangle",
+        startFreq: 220,
+        endFreq: 160,
+        glideTime: 0.1,
+        start: t,
+        duration: 0.11,
+        peak: 0.18,
+        attack: 0.005,
+        dest,
+      });
+      break;
+    }
+
+    case "Coral": {
+      // Dolphin — bubbly pop: ascending quick sine bubbles.
+      const notes = [700, 1000, 1400];
+      notes.forEach((f, i) => {
+        scheduleTone({
+          type: "sine",
+          startFreq: f,
+          start: t + i * 0.035,
+          duration: 0.045,
+          peak: 0.15,
+          attack: 0.003,
+          dest,
+        });
+      });
+      break;
+    }
+
+    case "Violet": {
+      // Butterfly — flutter tinkle: very high quick alternating sine pitches.
+      const notes = [2800, 3600, 2800, 3600];
+      notes.forEach((f, i) => {
+        scheduleTone({
+          type: "sine",
+          startFreq: f,
+          start: t + i * 0.02,
+          duration: 0.03,
+          peak: 0.12,
+          attack: 0.001,
+          dest,
+        });
+      });
+      break;
+    }
+
+    default: {
+      playSFX("shoot");
       break;
     }
   }

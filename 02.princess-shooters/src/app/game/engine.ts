@@ -56,6 +56,11 @@ export function createInitialState(): GameState {
     waveTransition: false,
     waveTransitionTimer: 0,
     startedAt: Date.now(),
+    superCharge: 0,
+    superReady: false,
+    superActive: false,
+    superActiveUntil: 0,
+    superAnimFrame: 0,
   };
 }
 
@@ -166,6 +171,45 @@ export function spawnPowerUp(x: number, y: number): PowerUp | null {
   };
 }
 
+export function activateSuper(state: GameState): Particle[] {
+  if (!state.superReady || state.superActive) return [];
+  state.superReady = false;
+  state.superActive = true;
+  state.superActiveUntil = Date.now() + 3000;
+  state.superCharge = 0;
+  state.superAnimFrame = 0;
+
+  const particles: Particle[] = [];
+  const { player } = state;
+  const color = player.princess.sparkleColor;
+
+  for (const enemy of state.enemies) {
+    enemy.health -= 5;
+    particles.push(...createExplosionParticles(enemy.x, enemy.y, color));
+  }
+  state.enemies = state.enemies.filter((e) => e.health > 0);
+
+  const deadCount = particles.length / 15;
+  state.score += Math.floor(deadCount) * 50 * state.wave;
+
+  for (let i = 0; i < 40; i++) {
+    const angle = (Math.PI * 2 * i) / 40;
+    const speed = 3 + Math.random() * 4;
+    particles.push({
+      x: player.x,
+      y: player.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 60 + Math.random() * 30,
+      maxLife: 90,
+      color,
+      size: 3 + Math.random() * 4,
+    });
+  }
+
+  return particles;
+}
+
 export function applyPowerUp(state: GameState, powerUp: PowerUp) {
   playSFX("powerUp");
   switch (powerUp.type) {
@@ -232,6 +276,15 @@ export function updateGameState(
     player.shieldActive = false;
   }
 
+  // Super attack expiry & animation frame
+  if (state.superActive) {
+    state.superAnimFrame++;
+    if (state.superActiveUntil < Date.now()) {
+      state.superActive = false;
+      state.superAnimFrame = 0;
+    }
+  }
+
   // Update stars
   for (const star of state.stars) {
     star.x -= star.speed * dt;
@@ -295,6 +348,11 @@ export function updateGameState(
           state.score += config.points * state.wave;
           newParticles.push(...createExplosionParticles(enemy.x, enemy.y, "#FFD700"));
           playSFX("enemyDefeat");
+          state.superCharge++;
+          if (state.superCharge >= 10 && !state.superReady && !state.superActive) {
+            state.superReady = true;
+            playSFX("superReady");
+          }
           const pu = spawnPowerUp(enemy.x, enemy.y);
           if (pu) newPowerUps.push(pu);
           state.enemies.splice(j, 1);
