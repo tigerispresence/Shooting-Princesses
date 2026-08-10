@@ -210,10 +210,15 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.textAlign = "center";
   ctx.fillText(`Wave ${state.wave}`, CANVAS_WIDTH / 2, 22);
 
-  ctx.fillStyle = "#AAAAAA";
-  ctx.font = "14px Arial";
+  ctx.fillStyle = state.player.princess.color;
+  ctx.font = "bold 14px Arial";
   ctx.textAlign = "right";
-  ctx.fillText(`Best: ${state.highScore}`, CANVAS_WIDTH - 15, 22);
+  ctx.fillText(state.player.princess.name, CANVAS_WIDTH - 15, 14);
+
+  ctx.fillStyle = "#AAAAAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "right";
+  ctx.fillText(`Best: ${state.highScore}`, CANVAS_WIDTH - 15, 32);
 
   if (state.rapidFireUntil > Date.now()) {
     ctx.fillStyle = "#FFD700";

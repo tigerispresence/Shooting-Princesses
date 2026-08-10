@@ -4,12 +4,14 @@ import { useState } from "react";
 import { PRINCESSES } from "./constants";
 
 interface CharacterSelectProps {
-  onSelect: (index: number) => void;
+  onSelect: (index: number, customName: string) => void;
 }
 
 export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
   const [selected, setSelected] = useState(0);
+  const [customName, setCustomName] = useState("");
   const princess = PRINCESSES[selected];
+  const displayName = customName.trim() || princess.name;
 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl mx-auto px-4">
@@ -32,9 +34,17 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
           <span>{princess.mountEmoji}</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold" style={{ color: princess.color }}>
-          {princess.name}
+          {displayName}
         </h2>
-        <p className="text-purple-200 text-sm sm:text-base">
+        <input
+          type="text"
+          value={customName}
+          onChange={(e) => setCustomName(e.target.value.slice(0, 16))}
+          placeholder={princess.name}
+          className="mt-2 px-3 py-1.5 rounded-lg bg-purple-800/50 border border-purple-400/40 text-center text-white text-sm sm:text-base placeholder-purple-400/50 focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50 w-48"
+          maxLength={16}
+        />
+        <p className="text-purple-200 text-sm sm:text-base mt-1">
           riding a <span className="font-semibold text-white">{princess.mount}</span>
         </p>
         <p className="text-yellow-200/80 text-xs sm:text-sm mt-1 italic">{princess.description}</p>
@@ -69,7 +79,7 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
 
       {/* Start button */}
       <button
-        onClick={() => onSelect(selected)}
+        onClick={() => onSelect(selected, customName.trim())}
         className="px-8 sm:px-12 py-3 sm:py-4 text-lg sm:text-xl font-bold rounded-full border-2 border-yellow-400 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
       >
         Start Adventure!

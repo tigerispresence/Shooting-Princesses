@@ -34,10 +34,15 @@ export default function GameCanvas() {
     setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
   }, []);
 
-  const startGame = useCallback((princessIndex: number) => {
+  const customNameRef = useRef("");
+
+  const startGame = useCallback((princessIndex: number, customName?: string) => {
     selectedPrincessRef.current = princessIndex;
+    if (customName !== undefined) customNameRef.current = customName;
     const state = createInitialState();
-    state.player.princess = PRINCESSES[princessIndex];
+    const princess = { ...PRINCESSES[princessIndex] };
+    if (customNameRef.current) princess.name = customNameRef.current;
+    state.player.princess = princess;
     state.started = true;
     stateRef.current = state;
     lastSpawnRef.current = 0;
