@@ -175,7 +175,7 @@ export function activateSuper(state: GameState): Particle[] {
   if (!state.superReady || state.superActive) return [];
   state.superReady = false;
   state.superActive = true;
-  state.superActiveUntil = Date.now() + 3000;
+  state.superActiveUntil = Date.now() + 4000;
   state.superCharge = 0;
   state.superAnimFrame = 0;
 

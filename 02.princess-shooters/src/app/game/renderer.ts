@@ -8,7 +8,7 @@ import {
   PowerUp,
 } from "./types";
 import { ENEMY_CONFIG, CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
-import { drawPrincessSprite, drawEnemySprite } from "./sprites";
+import { drawPrincessSprite, drawEnemySprite, drawPrincessPortrait } from "./sprites";
 import { STORY } from "./story";
 
 export function drawBackground(ctx: CanvasRenderingContext2D, stars: Star[], frame: number) {
@@ -312,6 +312,37 @@ export function drawGameOver(ctx: CanvasRenderingContext2D, state: GameState, fr
   ctx.fillText("Press SPACE or Click to play again", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80);
 }
 
+const SUPER_ATTACK_NAMES: Record<string, string> = {
+  Aurora: "Rainbow Radiance",
+  Luna: "Frost Dragon Breath",
+  Stella: "Celestial Wings",
+  Rose: "Phoenix Inferno",
+  Elara: "Swan Lake Cascade",
+  Ivy: "Forest Wrath",
+  Coral: "Tidal Surge",
+  Violet: "Butterfly Storm",
+};
+
+export function getSuperShake(state: GameState): { x: number; y: number } {
+  if (!state.superActive) return { x: 0, y: 0 };
+  const f = state.superAnimFrame;
+  if (f < 10) {
+    const intensity = 8;
+    return {
+      x: (Math.random() - 0.5) * intensity * 2,
+      y: (Math.random() - 0.5) * intensity * 2,
+    };
+  }
+  if (f < 60) {
+    const intensity = 4 * (1 - (f - 10) / 50);
+    return {
+      x: (Math.random() - 0.5) * intensity * 2,
+      y: (Math.random() - 0.5) * intensity * 2,
+    };
+  }
+  return { x: 0, y: 0 };
+}
+
 export function drawSuperAttack(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {
   if (!state.superActive) return;
 
@@ -319,73 +350,438 @@ export function drawSuperAttack(ctx: CanvasRenderingContext2D, state: GameState,
   const f = state.superAnimFrame;
   const color = player.princess.color;
   const sparkle = player.princess.sparkleColor;
-  const cx = player.x;
-  const cy = player.y;
+  const name = player.princess.name;
+  const attackName = SUPER_ATTACK_NAMES[name] || "Super Attack";
 
-  // Expanding shockwave rings
-  for (let i = 0; i < 3; i++) {
-    const ringFrame = f - i * 12;
-    if (ringFrame < 0) continue;
-    const radius = ringFrame * 8;
-    const alpha = Math.max(0, 0.6 - ringFrame * 0.008);
-    ctx.strokeStyle = i % 2 === 0 ? color : sparkle;
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = 4 - i;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.stroke();
+  // Phase 1 (f 0-12): Screen flash
+  if (f < 12) {
+    const flashAlpha = f < 4 ? Math.min(1, f / 4) : Math.max(0, 1 - (f - 4) / 8);
+    ctx.globalAlpha = flashAlpha * 0.9;
+    ctx.fillStyle = f < 4 ? "#FFFFFF" : color;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.globalAlpha = 1;
   }
 
-  // Rotating star burst
-  if (f < 90) {
-    const burstAlpha = Math.max(0, 0.8 - f * 0.009);
-    ctx.globalAlpha = burstAlpha;
-    const numRays = 12;
-    for (let i = 0; i < numRays; i++) {
-      const angle = (Math.PI * 2 * i) / numRays + f * 0.06;
-      const innerR = 30 + f * 2;
-      const outerR = 80 + f * 5;
-      const grad = ctx.createLinearGradient(
-        cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR,
-        cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR
-      );
-      grad.addColorStop(0, sparkle);
-      grad.addColorStop(1, "transparent");
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR);
-      ctx.lineTo(cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR);
-      ctx.stroke();
+  // Phase 2 (f 5-55): Dark overlay + diagonal slash + portrait cut-in
+  if (f >= 5 && f < 80) {
+    const overlayAlpha = f < 15 ? (f - 5) / 10 * 0.75 : f > 65 ? Math.max(0, (80 - f) / 15 * 0.75) : 0.75;
+    ctx.globalAlpha = overlayAlpha;
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.globalAlpha = 1;
+  }
+
+  // Diagonal slash lines
+  if (f >= 8 && f < 30) {
+    const slashProgress = Math.min(1, (f - 8) / 8);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, slashProgress * 2) * (f < 25 ? 1 : (30 - f) / 5);
+    ctx.strokeStyle = sparkle;
+    ctx.lineWidth = 4;
+    ctx.shadowColor = sparkle;
+    ctx.shadowBlur = 15;
+    const sx = -100 + slashProgress * (CANVAS_WIDTH + 200);
+    const sy = -50 + slashProgress * (CANVAS_HEIGHT + 100);
+    ctx.beginPath();
+    ctx.moveTo(sx - 200, sy - 100);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - 250, sy - 80);
+    ctx.lineTo(sx - 50, sy + 20);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // Portrait cut-in from left
+  if (f >= 10 && f < 75) {
+    const enterDuration = 12;
+    const holdStart = 10 + enterDuration;
+    const exitStart = 60;
+
+    let portraitX: number;
+    if (f < holdStart) {
+      const t = (f - 10) / enterDuration;
+      const ease = 1 - Math.pow(1 - t, 3);
+      portraitX = -150 + ease * 270;
+    } else if (f < exitStart) {
+      portraitX = 120;
+    } else {
+      const t = (f - exitStart) / 15;
+      portraitX = 120 - t * 300;
+    }
+
+    const portraitY = CANVAS_HEIGHT / 2 - 20;
+    const portraitAlpha = f < holdStart
+      ? Math.min(1, (f - 10) / 8)
+      : f >= exitStart
+        ? Math.max(0, 1 - (f - exitStart) / 10)
+        : 1;
+
+    ctx.save();
+    ctx.globalAlpha = portraitAlpha;
+
+    // Portrait glow behind
+    const glowGrad = ctx.createRadialGradient(portraitX, portraitY, 30, portraitX, portraitY, 180);
+    glowGrad.addColorStop(0, color);
+    glowGrad.addColorStop(1, "transparent");
+    ctx.globalAlpha = portraitAlpha * 0.4;
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(portraitX - 180, portraitY - 180, 360, 360);
+
+    ctx.globalAlpha = portraitAlpha;
+    drawPrincessPortrait(ctx, player.princess, portraitX, portraitY, 1.1, frame);
+    ctx.restore();
+
+    // Attack name text on right side
+    if (f >= 18 && f < 65) {
+      const textAlpha = f < 25 ? (f - 18) / 7 : f > 55 ? Math.max(0, (65 - f) / 10) : 1;
+      ctx.save();
+      ctx.globalAlpha = textAlpha;
+
+      ctx.font = "bold 38px Arial";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillText(attackName, CANVAS_WIDTH - 40, CANVAS_HEIGHT / 2 - 30);
+
+      ctx.font = "bold 22px Arial";
+      ctx.fillStyle = sparkle;
+      ctx.shadowColor = sparkle;
+      ctx.fillText(`— ${name} —`, CANVAS_WIDTH - 40, CANVAS_HEIGHT / 2 + 10);
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
     }
   }
 
-  // Screen edge glow
-  const glowAlpha = Math.max(0, 0.3 - f * 0.003);
-  const edgeGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, CANVAS_WIDTH);
-  edgeGrad.addColorStop(0, "transparent");
-  edgeGrad.addColorStop(0.6, "transparent");
-  edgeGrad.addColorStop(1, color);
-  ctx.globalAlpha = glowAlpha;
-  ctx.fillStyle = edgeGrad;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  // Phase 3 (f 50-150): Character-specific mega effect
+  if (f >= 50) {
+    drawCharacterSuperEffect(ctx, state, f - 50, color, sparkle, name);
+  }
 
-  // Floating sparkle symbols around the princess
-  ctx.globalAlpha = Math.max(0, 0.9 - f * 0.005);
-  ctx.font = "bold 16px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = sparkle;
-  for (let i = 0; i < 8; i++) {
-    const orbitAngle = (Math.PI * 2 * i) / 8 + f * 0.04;
-    const orbitR = 50 + Math.sin(f * 0.1 + i) * 15;
-    const sx = cx + Math.cos(orbitAngle) * orbitR;
-    const sy = cy + Math.sin(orbitAngle) * orbitR;
-    ctx.fillText("✦", sx, sy);
+  // Phase 4: Trailing sparkle particles throughout
+  if (f >= 10) {
+    ctx.globalAlpha = Math.max(0, 0.8 - (f - 10) * 0.005);
+    for (let i = 0; i < 6; i++) {
+      const sparkleAngle = f * 0.05 + (Math.PI * 2 * i) / 6;
+      const sparkleR = 40 + f * 2 + Math.sin(f * 0.15 + i * 3) * 30;
+      const sx = player.x + Math.cos(sparkleAngle) * sparkleR;
+      const sy = player.y + Math.sin(sparkleAngle) * sparkleR;
+      if (sx > 0 && sx < CANVAS_WIDTH && sy > 0 && sy < CANVAS_HEIGHT) {
+        const sGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 8);
+        sGrad.addColorStop(0, sparkle);
+        sGrad.addColorStop(1, "transparent");
+        ctx.fillStyle = sGrad;
+        ctx.fillRect(sx - 8, sy - 8, 16, 16);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   ctx.globalAlpha = 1;
   ctx.lineWidth = 1;
+}
+
+function drawCharacterSuperEffect(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  ef: number,
+  color: string,
+  sparkle: string,
+  name: string
+) {
+  const cx = CANVAS_WIDTH / 2;
+  const cy = CANVAS_HEIGHT / 2;
+  const alpha = Math.max(0, 1 - ef / 120);
+
+  switch (name) {
+    case "Aurora": {
+      // Rainbow Radiance — rainbow arcs sweeping across screen
+      const colors = ["#FF0000", "#FF7700", "#FFFF00", "#00FF00", "#0077FF", "#8800FF", "#FF00FF"];
+      for (let i = 0; i < colors.length; i++) {
+        const arcX = -200 + (ef * 12 + i * 60) % (CANVAS_WIDTH + 400);
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.strokeStyle = colors[i];
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.arc(arcX, CANVAS_HEIGHT + 100, 250 - i * 15, Math.PI, 0);
+        ctx.stroke();
+      }
+      // Sparkle rain
+      for (let i = 0; i < 20; i++) {
+        ctx.globalAlpha = alpha * 0.6;
+        const rx = (i * 43 + ef * 3) % CANVAS_WIDTH;
+        const ry = (i * 67 + ef * 5) % CANVAS_HEIGHT;
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.beginPath();
+        ctx.arc(rx, ry, 3 + Math.sin(ef * 0.2 + i) * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "Luna": {
+      // Frost Dragon Breath — ice crystals expanding
+      ctx.globalAlpha = alpha * 0.5;
+      for (let i = 0; i < 12; i++) {
+        const angle = (Math.PI * 2 * i) / 12 + ef * 0.02;
+        const dist = ef * 5;
+        const ix = cx + Math.cos(angle) * dist;
+        const iy = cy + Math.sin(angle) * dist;
+        ctx.strokeStyle = "#88DDFF";
+        ctx.lineWidth = 2;
+        drawIceCrystal(ctx, ix, iy, 15 + Math.sin(ef * 0.1 + i) * 5, angle + ef * 0.05);
+      }
+      // Frost mist
+      const frostGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, ef * 6);
+      frostGrad.addColorStop(0, "rgba(136, 221, 255, 0.3)");
+      frostGrad.addColorStop(1, "transparent");
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.fillStyle = frostGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      break;
+    }
+    case "Stella": {
+      // Celestial Wings — feathered wind blades spiraling
+      ctx.globalAlpha = alpha * 0.7;
+      for (let i = 0; i < 16; i++) {
+        const angle = (Math.PI * 2 * i) / 16 + ef * 0.08;
+        const dist = 50 + ef * 4;
+        const wx = cx + Math.cos(angle) * dist;
+        const wy = cy + Math.sin(angle) * dist;
+        ctx.fillStyle = i % 2 === 0 ? "#E8E0FF" : sparkle;
+        ctx.save();
+        ctx.translate(wx, wy);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4, 18 + Math.sin(ef * 0.15 + i) * 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      // Whirlwind center
+      ctx.strokeStyle = "#C8B8FF";
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = alpha * 0.5;
+      for (let ring = 0; ring < 3; ring++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 30 + ef * 3 + ring * 25, ef * 0.1, ef * 0.1 + Math.PI * 1.5);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "Rose": {
+      // Phoenix Inferno — fire columns erupting from bottom
+      for (let i = 0; i < 8; i++) {
+        const fx = 50 + i * (CANVAS_WIDTH - 100) / 7;
+        const height = Math.min(CANVAS_HEIGHT, ef * 8 + Math.sin(ef * 0.2 + i * 2) * 40);
+        const fireGrad = ctx.createLinearGradient(fx, CANVAS_HEIGHT, fx, CANVAS_HEIGHT - height);
+        fireGrad.addColorStop(0, "#FF4400");
+        fireGrad.addColorStop(0.4, "#FF8800");
+        fireGrad.addColorStop(0.7, "#FFCC00");
+        fireGrad.addColorStop(1, "transparent");
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.fillStyle = fireGrad;
+        const w = 30 + Math.sin(ef * 0.3 + i) * 10;
+        ctx.beginPath();
+        ctx.moveTo(fx - w, CANVAS_HEIGHT);
+        ctx.quadraticCurveTo(fx - w * 0.3, CANVAS_HEIGHT - height * 0.6, fx, CANVAS_HEIGHT - height);
+        ctx.quadraticCurveTo(fx + w * 0.3, CANVAS_HEIGHT - height * 0.6, fx + w, CANVAS_HEIGHT);
+        ctx.fill();
+      }
+      // Embers
+      for (let i = 0; i < 15; i++) {
+        ctx.globalAlpha = alpha * 0.8;
+        const ex = (i * 59 + ef * 4) % CANVAS_WIDTH;
+        const ey = CANVAS_HEIGHT - (i * 47 + ef * 6) % CANVAS_HEIGHT;
+        ctx.fillStyle = i % 3 === 0 ? "#FF4400" : i % 3 === 1 ? "#FF8800" : "#FFCC00";
+        ctx.beginPath();
+        ctx.arc(ex, ey, 2 + Math.random() * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "Elara": {
+      // Swan Lake Cascade — elegant feathers raining down
+      for (let i = 0; i < 20; i++) {
+        const fx = (i * 47 + ef * 2) % (CANVAS_WIDTH + 40) - 20;
+        const fy = (i * 73 + ef * 4) % (CANVAS_HEIGHT + 40) - 20;
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.fillStyle = i % 3 === 0 ? "#FFFFFF" : i % 3 === 1 ? "#FFE4E1" : sparkle;
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.rotate(Math.sin(ef * 0.05 + i) * 0.5);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 3, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.lineTo(0, 12);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // Elegant ripple rings
+      for (let ring = 0; ring < 4; ring++) {
+        const r = ef * 4 + ring * 40;
+        ctx.globalAlpha = alpha * Math.max(0, 0.5 - ring * 0.1);
+        ctx.strokeStyle = "#FFE4E1";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, r * 1.5, r * 0.8, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "Ivy": {
+      // Forest Wrath — vines reaching across screen
+      ctx.globalAlpha = alpha * 0.8;
+      for (let v = 0; v < 6; v++) {
+        const startAngle = (Math.PI * 2 * v) / 6 + 0.3;
+        ctx.strokeStyle = v % 2 === 0 ? "#228B22" : "#32CD32";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        const segments = Math.min(20, Math.floor(ef / 2));
+        let vx = cx;
+        let vy = cy;
+        ctx.moveTo(vx, vy);
+        for (let s = 0; s < segments; s++) {
+          const a = startAngle + Math.sin(s * 0.8 + v) * 0.6;
+          vx += Math.cos(a) * 25;
+          vy += Math.sin(a) * 25;
+          ctx.lineTo(vx, vy);
+        }
+        ctx.stroke();
+        // Leaves at vine tips
+        if (segments > 3) {
+          ctx.fillStyle = "#32CD32";
+          ctx.beginPath();
+          ctx.ellipse(vx, vy, 8, 5, startAngle, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // Green aura
+      const greenGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, ef * 5);
+      greenGrad.addColorStop(0, "rgba(34, 139, 34, 0.3)");
+      greenGrad.addColorStop(1, "transparent");
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.fillStyle = greenGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      break;
+    }
+    case "Coral": {
+      // Tidal Surge — wave crashing across screen
+      ctx.globalAlpha = alpha * 0.6;
+      for (let w = 0; w < 3; w++) {
+        const waveX = -300 + ef * 10 - w * 120;
+        ctx.fillStyle = w === 0 ? "#0077BE" : w === 1 ? "#00A5CF" : "#00CED1";
+        ctx.beginPath();
+        ctx.moveTo(waveX, 0);
+        for (let px = 0; px < CANVAS_WIDTH + 200; px += 10) {
+          const py = CANVAS_HEIGHT / 2 + Math.sin((px + waveX) * 0.02 + w) * (60 + w * 20)
+            + Math.sin((px + waveX) * 0.05 + ef * 0.1) * 20;
+          ctx.lineTo(waveX + px, py);
+        }
+        ctx.lineTo(waveX + CANVAS_WIDTH + 200, CANVAS_HEIGHT);
+        ctx.lineTo(waveX, CANVAS_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // Bubbles
+      for (let i = 0; i < 15; i++) {
+        const bx = (i * 61 + ef * 5) % CANVAS_WIDTH;
+        const by = (i * 43 + ef * 3) % CANVAS_HEIGHT;
+        const br = 4 + Math.sin(ef * 0.2 + i) * 2;
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(bx, by, br, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "Violet": {
+      // Butterfly Storm — swarm of butterfly shapes
+      for (let i = 0; i < 24; i++) {
+        const angle = (Math.PI * 2 * i) / 24 + ef * 0.03;
+        const dist = 20 + ef * 3 + Math.sin(ef * 0.08 + i * 2) * 40;
+        const bx = cx + Math.cos(angle) * dist;
+        const by = cy + Math.sin(angle) * dist;
+        if (bx < -20 || bx > CANVAS_WIDTH + 20 || by < -20 || by > CANVAS_HEIGHT + 20) continue;
+        ctx.globalAlpha = alpha * 0.8;
+        const wingFlap = Math.sin(ef * 0.3 + i * 1.5) * 0.6;
+        const hue = (i * 30 + ef * 5) % 360;
+        ctx.fillStyle = `hsl(${hue}, 80%, 70%)`;
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(angle);
+        // Left wing
+        ctx.beginPath();
+        ctx.ellipse(-4, 0, 6, 10 * (0.6 + wingFlap * 0.4), -0.3 + wingFlap * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // Right wing
+        ctx.beginPath();
+        ctx.ellipse(4, 0, 6, 10 * (0.6 + wingFlap * 0.4), 0.3 - wingFlap * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // Body
+        ctx.fillStyle = "#333";
+        ctx.fillRect(-1, -4, 2, 8);
+        ctx.restore();
+      }
+      // Sparkle dust trail
+      const violetGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, ef * 5);
+      violetGrad.addColorStop(0, "rgba(148, 0, 211, 0.25)");
+      violetGrad.addColorStop(1, "transparent");
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.fillStyle = violetGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      break;
+    }
+    default: {
+      // Fallback: expanding energy rings
+      for (let i = 0; i < 5; i++) {
+        const r = ef * 6 + i * 30;
+        ctx.globalAlpha = alpha * Math.max(0, 0.6 - i * 0.1);
+        ctx.strokeStyle = i % 2 === 0 ? color : sparkle;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1;
+}
+
+function drawIceCrystal(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, angle: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI * 2 * i) / 6;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size);
+    ctx.stroke();
+    // Branch tips
+    const bx = Math.cos(a) * size * 0.6;
+    const by = Math.sin(a) * size * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + Math.cos(a + 0.5) * size * 0.3, by + Math.sin(a + 0.5) * size * 0.3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + Math.cos(a - 0.5) * size * 0.3, by + Math.sin(a - 0.5) * size * 0.3);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 export function drawBattleCry(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {

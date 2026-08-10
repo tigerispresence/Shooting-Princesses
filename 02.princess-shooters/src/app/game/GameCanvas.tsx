@@ -15,6 +15,7 @@ import {
   drawWaveTransition,
   drawBattleCry,
   drawSuperAttack,
+  getSuperShake,
 } from "./renderer";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
@@ -196,6 +197,13 @@ export default function GameCanvas() {
       }
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const shake = getSuperShake(state);
+      if (shake.x !== 0 || shake.y !== 0) {
+        ctx.save();
+        ctx.translate(shake.x, shake.y);
+      }
+
       drawBackground(ctx, state.stars, frame);
 
       for (const pu of state.powerUps) drawPowerUp(ctx, pu, frame);
@@ -209,6 +217,10 @@ export default function GameCanvas() {
       drawBattleCry(ctx, state, frame);
       if (state.waveTransition) drawWaveTransition(ctx, state.wave, frame);
       if (state.gameOver) drawGameOver(ctx, state, frame);
+
+      if (shake.x !== 0 || shake.y !== 0) {
+        ctx.restore();
+      }
 
       if (state.paused && !state.gameOver) {
         ctx.fillStyle = "rgba(0,0,0,0.5)";

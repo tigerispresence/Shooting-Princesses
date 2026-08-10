@@ -1602,3 +1602,527 @@ function drawDragonEnemy(ctx: CanvasRenderingContext2D, frame: number) {
 
   ctx.restore();
 }
+
+/* ------------------------------------------------------------------ */
+/*  Gunbird-style super attack cut-in portrait                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Draws a large dramatic close-up portrait of the princess's face and
+ * upper body, used for the super-attack cut-in. Roughly 200x250px at
+ * scale = 1.0, centered on (x, y).
+ */
+export function drawPrincessPortrait(
+  ctx: CanvasRenderingContext2D,
+  princess: Princess,
+  x: number,
+  y: number,
+  scale: number,
+  frame: number
+): void {
+  const sway = Math.sin(frame * 0.05) * 4;
+  const eyeShift = Math.sin(frame * 0.08) * 1.4;
+  const gemGlow = 0.5 + 0.5 * Math.sin(frame * 0.12);
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+
+  drawPortraitHairBack(ctx, princess, sway, frame);
+  drawPortraitShoulders(ctx, princess);
+  drawPortraitNeck(ctx, princess);
+  drawPortraitFace(ctx, princess);
+  drawPortraitHairFront(ctx, princess, sway, frame);
+  drawPortraitEyes(ctx, princess, eyeShift);
+  drawPortraitFaceDetails(ctx);
+  drawPortraitCrown(ctx, princess, gemGlow);
+  drawPortraitSparkles(ctx, princess, frame);
+
+  ctx.restore();
+}
+
+function drawPortraitShoulders(ctx: CanvasRenderingContext2D, p: Princess) {
+  // Dress body / shoulders
+  ctx.fillStyle = p.dressColor;
+  ctx.beginPath();
+  ctx.moveTo(-95, 135);
+  ctx.lineTo(-72, 55);
+  ctx.quadraticCurveTo(-38, 38, 0, 40);
+  ctx.quadraticCurveTo(38, 38, 72, 55);
+  ctx.lineTo(95, 135);
+  ctx.closePath();
+  ctx.fill();
+
+  // Neckline / collar accent
+  ctx.fillStyle = p.dressAccent;
+  ctx.beginPath();
+  ctx.moveTo(-36, 48);
+  ctx.quadraticCurveTo(0, 70, 36, 48);
+  ctx.quadraticCurveTo(22, 92, 0, 104);
+  ctx.quadraticCurveTo(-22, 92, -36, 48);
+  ctx.fill();
+
+  // Collar trim
+  ctx.strokeStyle = p.crownColor;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-36, 48);
+  ctx.quadraticCurveTo(0, 68, 36, 48);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Collar gem
+  ctx.fillStyle = p.crownGem;
+  ctx.beginPath();
+  ctx.arc(0, 68, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFFFFF99";
+  ctx.beginPath();
+  ctx.arc(-1.5, 66.5, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shoulder puff / sleeve hints
+  ctx.fillStyle = p.dressAccent;
+  ctx.beginPath();
+  ctx.ellipse(-78, 62, 16, 12, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(78, 62, 16, 12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPortraitNeck(ctx: CanvasRenderingContext2D, p: Princess) {
+  ctx.fillStyle = p.skinColor;
+  ctx.fillRect(-16, 28, 32, 32);
+  // Slight shading for form
+  ctx.fillStyle = "rgba(0,0,0,0.06)";
+  ctx.fillRect(-16, 28, 8, 32);
+}
+
+function drawPortraitFace(ctx: CanvasRenderingContext2D, p: Princess) {
+  ctx.fillStyle = p.skinColor;
+  ctx.beginPath();
+  ctx.ellipse(0, -28, 52, 62, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPortraitEyes(
+  ctx: CanvasRenderingContext2D,
+  p: Princess,
+  eyeShift: number
+) {
+  for (const side of [-1, 1] as const) {
+    const ex = side * 22;
+    const ey = -26;
+
+    // Eye white (big anime shape)
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, 15, 19, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Iris
+    const irisX = ex + eyeShift * side * 0.3;
+    const irisY = ey + 2;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(irisX, irisY, 10.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pupil
+    ctx.fillStyle = "#1A1A1A";
+    ctx.beginPath();
+    ctx.arc(irisX, irisY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Big shine
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(irisX - 4, irisY - 5, 3.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Small secondary shine
+    ctx.beginPath();
+    ctx.arc(irisX + 5, irisY + 5, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Upper lash line (bold, determined)
+    ctx.strokeStyle = "#2A2A2A";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(ex - side * 15, ey - 10);
+    ctx.quadraticCurveTo(ex, ey - 22, ex + side * 15, ey - 8);
+    ctx.stroke();
+    // Outer lash flick
+    ctx.beginPath();
+    ctx.moveTo(ex + side * 15, ey - 8);
+    ctx.lineTo(ex + side * 20, ey - 13);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+    ctx.lineWidth = 1;
+
+    // Eyebrow — angled for a determined, fierce-but-cute look
+    const innerX = side * 8;
+    const outerX = side * 32;
+    ctx.strokeStyle = "rgba(50,35,30,0.75)";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(innerX, ey - 19);
+    ctx.quadraticCurveTo(ex, ey - 30, outerX, ey - 25);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+    ctx.lineWidth = 1;
+  }
+}
+
+function drawPortraitFaceDetails(ctx: CanvasRenderingContext2D) {
+  // Nose — subtle curve
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-2, -4);
+  ctx.quadraticCurveTo(1, 6, 5, 9);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Blush
+  ctx.fillStyle = "#FF9AA299";
+  ctx.beginPath();
+  ctx.ellipse(-33, 6, 12, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(33, 6, 12, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mouth — confident smirk
+  ctx.strokeStyle = "#C0392B";
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-15, 21);
+  ctx.quadraticCurveTo(0, 32, 17, 16);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.lineWidth = 1;
+}
+
+function drawPortraitCrown(
+  ctx: CanvasRenderingContext2D,
+  p: Princess,
+  glow: number
+) {
+  ctx.save();
+  ctx.shadowColor = p.crownGem;
+  ctx.shadowBlur = 12 + glow * 10;
+
+  ctx.fillStyle = p.crownColor;
+
+  // Crown band
+  ctx.beginPath();
+  ctx.moveTo(-40, -80);
+  ctx.lineTo(-40, -68);
+  ctx.lineTo(40, -68);
+  ctx.lineTo(40, -80);
+  ctx.closePath();
+  ctx.fill();
+
+  // Points with gems (5 points, tallest in the center)
+  const points: [number, number][] = [
+    [-32, 20],
+    [-16, 28],
+    [0, 38],
+    [16, 28],
+    [32, 20],
+  ];
+  for (const [px, h] of points) {
+    ctx.fillStyle = p.crownColor;
+    ctx.beginPath();
+    ctx.moveTo(px - 8, -80);
+    ctx.lineTo(px, -80 - h);
+    ctx.lineTo(px + 8, -80);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = p.crownGem;
+    ctx.beginPath();
+    ctx.arc(px, -80 - h + 6, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.shadowBlur = 0;
+
+  // Center gem, larger, with glimmer
+  ctx.fillStyle = p.crownGem;
+  ctx.beginPath();
+  ctx.arc(0, -74, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,255,255,${0.35 + glow * 0.5})`;
+  ctx.beginPath();
+  ctx.arc(-2.2, -76, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawPortraitSparkles(
+  ctx: CanvasRenderingContext2D,
+  p: Princess,
+  frame: number
+) {
+  ctx.save();
+  ctx.fillStyle = p.sparkleColor;
+  for (let i = 0; i < 6; i++) {
+    const angle = frame * 0.02 + (i * Math.PI * 2) / 6;
+    const r = 95 + Math.sin(frame * 0.05 + i) * 10;
+    const sx = Math.cos(angle) * r;
+    const sy = Math.sin(angle) * r * 0.55 - 15;
+    const alpha = 0.25 + 0.35 * Math.sin(frame * 0.1 + i * 1.3);
+    ctx.globalAlpha = Math.max(0, alpha);
+    drawPortraitSparkleStar(ctx, sx, sy, 4 + (i % 2) * 2.5);
+  }
+  ctx.restore();
+}
+
+function drawPortraitSparkleStar(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - size);
+  ctx.quadraticCurveTo(sx + size * 0.2, sy - size * 0.2, sx + size, sy);
+  ctx.quadraticCurveTo(sx + size * 0.2, sy + size * 0.2, sx, sy + size);
+  ctx.quadraticCurveTo(sx - size * 0.2, sy + size * 0.2, sx - size, sy);
+  ctx.quadraticCurveTo(sx - size * 0.2, sy - size * 0.2, sx, sy - size);
+  ctx.fill();
+}
+
+function drawPortraitHairBack(
+  ctx: CanvasRenderingContext2D,
+  p: Princess,
+  sway: number,
+  frame: number
+) {
+  ctx.fillStyle = p.hairColor;
+
+  // Base cap — big halo of hair behind the head/face
+  ctx.beginPath();
+  ctx.ellipse(0, -34, 62, 72, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  switch (p.hairStyle) {
+    case "long": {
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(side * 50, -50);
+        ctx.bezierCurveTo(
+          side * (75 + sway), -10,
+          side * (60 + sway * 1.5), 60,
+          side * (45 + sway * 2), 130
+        );
+        ctx.bezierCurveTo(
+          side * (30 + sway), 60,
+          side * 40, -10,
+          side * 38, -50
+        );
+        ctx.fill();
+      }
+      break;
+    }
+    case "ponytail": {
+      // Swept dramatically to one side
+      ctx.beginPath();
+      ctx.moveTo(30, -60);
+      ctx.bezierCurveTo(
+        75 + sway * 2, -30,
+        90 + sway * 3, 30,
+        70 + sway * 3, 110
+      );
+      ctx.bezierCurveTo(
+        55 + sway, 30,
+        45 + sway, -20,
+        45, -60
+      );
+      ctx.fill();
+      break;
+    }
+    case "buns": {
+      for (const side of [-1, 1] as const) {
+        // Bun
+        ctx.beginPath();
+        ctx.arc(side * 34, -88, 20, 0, Math.PI * 2);
+        ctx.fill();
+        // Loose strand flowing from bun
+        ctx.beginPath();
+        ctx.moveTo(side * 40, -78);
+        ctx.bezierCurveTo(
+          side * (55 + sway), -40,
+          side * (45 + sway), 20,
+          side * (38 + sway), 70
+        );
+        ctx.bezierCurveTo(
+          side * (28 + sway * 0.5), 20,
+          side * 32, -40,
+          side * 28, -80
+        );
+        ctx.fill();
+      }
+      break;
+    }
+    case "short": {
+      // Windswept spiky bob — layered spikes around the head
+      for (let i = 0; i < 7; i++) {
+        const a = -Math.PI * 0.85 + (i / 6) * Math.PI * 1.7;
+        const wobble = Math.sin(frame * 0.08 + i) * 3;
+        const baseX = Math.cos(a) * 58;
+        const baseY = -34 + Math.sin(a) * 66;
+        const tipX = Math.cos(a) * (80 + wobble);
+        const tipY = -34 + Math.sin(a) * (88 + wobble);
+        ctx.beginPath();
+        ctx.moveTo(baseX * 0.7, baseY * 0.7 - 20);
+        ctx.lineTo(tipX, tipY - 20);
+        ctx.lineTo(baseX * 1.1, baseY * 1.1 - 10);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case "braids": {
+      for (const side of [-1, 1] as const) {
+        for (let i = 0; i < 5; i++) {
+          const bx = side * (46 + Math.sin(frame * 0.05 + i) * 2 * side);
+          const by = -30 + i * 22;
+          ctx.beginPath();
+          ctx.ellipse(bx, by, 11, 9, side * 0.15, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      break;
+    }
+    case "wavy": {
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(side * 48, -55);
+        ctx.bezierCurveTo(
+          side * (75 + sway), -20,
+          side * (35 - sway), 20,
+          side * (68 + sway), 60
+        );
+        ctx.bezierCurveTo(
+          side * (35 - sway), 90,
+          side * (65 + sway), 120,
+          side * (42 + sway), 145
+        );
+        ctx.bezierCurveTo(
+          side * 20, 100,
+          side * 30, 20,
+          side * 30, -50
+        );
+        ctx.fill();
+      }
+      break;
+    }
+    case "curly": {
+      for (const side of [-1, 1] as const) {
+        for (let i = 0; i < 6; i++) {
+          const cx = side * (48 + Math.sin(frame * 0.05 + i) * 3);
+          const cy = -50 + i * 20;
+          const r = 15 - i * 0.6;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      break;
+    }
+    case "twintail": {
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(side * 34, -70);
+        ctx.bezierCurveTo(
+          side * (70 + sway * 1.5), -30,
+          side * (85 + sway * 2), 40,
+          side * (60 + sway * 2.5), 120
+        );
+        ctx.bezierCurveTo(
+          side * (40 + sway), 40,
+          side * 40, -20,
+          side * 24, -72
+        );
+        ctx.fill();
+      }
+      break;
+    }
+  }
+}
+
+function drawPortraitHairFront(
+  ctx: CanvasRenderingContext2D,
+  p: Princess,
+  sway: number,
+  frame: number
+) {
+  ctx.fillStyle = p.hairColor;
+
+  // Fringe / bangs across the forehead
+  ctx.beginPath();
+  ctx.moveTo(-52, -70);
+  ctx.quadraticCurveTo(-22, -94, 0, -90);
+  ctx.quadraticCurveTo(22, -94, 52, -70);
+  ctx.quadraticCurveTo(30, -80, 0, -82);
+  ctx.quadraticCurveTo(-30, -80, -52, -70);
+  ctx.fill();
+
+  // Side strands framing the face, swaying gently
+  for (const side of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(side * 46, -58);
+    ctx.bezierCurveTo(
+      side * (58 + sway), -20,
+      side * (48 + sway * 1.4), 25,
+      side * (38 + sway * 1.8), 58
+    );
+    ctx.bezierCurveTo(
+      side * (32 + sway), 25,
+      side * 42, -14,
+      side * 38, -58
+    );
+    ctx.fill();
+  }
+
+  // Style-specific front accents
+  switch (p.hairStyle) {
+    case "buns": {
+      ctx.fillStyle = p.dressAccent;
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.ellipse(side * 34, -102, 6, 4, side * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "twintail": {
+      ctx.fillStyle = p.dressAccent;
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.arc(side * 32, -70, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "short": {
+      ctx.fillStyle = p.hairColor;
+      const spike = Math.sin(frame * 0.1) * 3;
+      ctx.beginPath();
+      ctx.moveTo(-8, -84);
+      ctx.lineTo(-2 + spike, -102);
+      ctx.lineTo(6, -84);
+      ctx.fill();
+      break;
+    }
+    default:
+      break;
+  }
+}
