@@ -43,6 +43,15 @@ export default function GameCanvas() {
     setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
   }, []);
 
+  useEffect(() => {
+    if (screen === "playing") {
+      document.body.classList.add("game-active");
+    } else {
+      document.body.classList.remove("game-active");
+    }
+    return () => document.body.classList.remove("game-active");
+  }, [screen]);
+
   const customNameRef = useRef("");
 
   const startGame = useCallback((princessIndex: number, customName?: string) => {
@@ -253,7 +262,7 @@ export default function GameCanvas() {
 
   if (screen === "select") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="flex flex-col items-center justify-start sm:justify-center min-h-screen p-2 sm:p-4 overflow-y-auto">
         <CharacterSelect onSelect={startGame} />
       </div>
     );

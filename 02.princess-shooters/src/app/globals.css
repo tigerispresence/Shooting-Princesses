@@ -24,7 +24,7 @@ body {
 }
 
 @media (max-width: 640px) {
-  body {
+  body.game-active {
     overflow: hidden;
     position: fixed;
     width: 100%;
