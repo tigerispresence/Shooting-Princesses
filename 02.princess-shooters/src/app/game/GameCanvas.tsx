@@ -20,7 +20,7 @@ import {
 import TitleScreen from "./TitleScreen";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
-import { initAudio, playBGM, stopBGM, playSFX, playCharacterShoot, toggleMute, isMuted } from "./audio";
+import { initAudio, setupIOSAudioUnlock, playBGM, stopBGM, playSFX, playCharacterShoot, toggleMute, isMuted } from "./audio";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,6 +41,7 @@ export default function GameCanvas() {
 
   useEffect(() => {
     setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
+    setupIOSAudioUnlock();
   }, []);
 
   useEffect(() => {

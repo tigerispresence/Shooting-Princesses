@@ -41,14 +41,11 @@ interface WindowWithWebkitAudio extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-let unlocked = false;
-
 /** Creates the shared AudioContext + gain graph. Safe to call multiple times. */
 export function initAudio(): void {
   if (typeof window === "undefined") return;
   if (audioCtx) {
     if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
-    if (!unlocked) unlockiOS();
     return;
   }
 
@@ -72,24 +69,56 @@ export function initAudio(): void {
   if (audioCtx.state === "suspended") {
     audioCtx.resume().catch(() => {});
   }
-
-  unlockiOS();
 }
 
-function unlockiOS(): void {
-  if (unlocked || !audioCtx) return;
-  unlocked = true;
+/**
+ * iOS Safari/Chrome require AudioContext creation + resume + buffer playback
+ * all inside a native (not React synthetic) touchend/click handler.
+ * Call this once from a useEffect to attach global unlock listeners.
+ */
+export function setupIOSAudioUnlock(): void {
+  if (typeof document === "undefined") return;
 
-  // iOS requires playing an actual buffer from a user gesture to fully unlock
-  const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audioCtx.destination);
-  source.start(0);
-  source.stop(audioCtx.currentTime + 0.001);
-  source.onended = () => source.disconnect();
+  function unlock() {
+    const AC = window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext;
+    if (!AC) return;
 
-  audioCtx.resume().catch(() => {});
+    if (!audioCtx) {
+      audioCtx = new AC();
+
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = muted ? 0 : masterVolume;
+      masterGain.connect(audioCtx.destination);
+
+      bgmGain = audioCtx.createGain();
+      bgmGain.gain.value = 1;
+      bgmGain.connect(masterGain);
+
+      sfxGain = audioCtx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
+    }
+
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+
+    // Play a silent buffer — required by iOS to fully unlock the audio pipeline
+    const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+    source.onended = () => source.disconnect();
+
+    // Remove listeners after successful unlock
+    document.removeEventListener("touchend", unlock, true);
+    document.removeEventListener("click", unlock, true);
+  }
+
+  // Use capturing phase + native events (not React synthetic) for iOS
+  document.addEventListener("touchend", unlock, true);
+  document.addEventListener("click", unlock, true);
 }
 
 /** Lazily ensures audio is ready (auto-inits + resumes) and returns the context, or null on the server. */
