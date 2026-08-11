@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback } from "react";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
+import { initAudio } from "./audio";
 
 interface TitleScreenProps {
   onStart: () => void;
@@ -13,6 +14,7 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
   const animRef = useRef<number>(0);
 
   const handleStart = useCallback(() => {
+    initAudio();
     cancelAnimationFrame(animRef.current);
     onStart();
   }, [onStart]);

@@ -41,11 +41,14 @@ interface WindowWithWebkitAudio extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
+let unlocked = false;
+
 /** Creates the shared AudioContext + gain graph. Safe to call multiple times. */
 export function initAudio(): void {
   if (typeof window === "undefined") return;
   if (audioCtx) {
     if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    if (!unlocked) unlockiOS();
     return;
   }
 
@@ -69,6 +72,24 @@ export function initAudio(): void {
   if (audioCtx.state === "suspended") {
     audioCtx.resume().catch(() => {});
   }
+
+  unlockiOS();
+}
+
+function unlockiOS(): void {
+  if (unlocked || !audioCtx) return;
+  unlocked = true;
+
+  // iOS requires playing an actual buffer from a user gesture to fully unlock
+  const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioCtx.destination);
+  source.start(0);
+  source.stop(audioCtx.currentTime + 0.001);
+  source.onended = () => source.disconnect();
+
+  audioCtx.resume().catch(() => {});
 }
 
 /** Lazily ensures audio is ready (auto-inits + resumes) and returns the context, or null on the server. */

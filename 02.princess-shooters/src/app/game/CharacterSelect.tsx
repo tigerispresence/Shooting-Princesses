@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { PRINCESSES, PLAYER_WIDTH, PLAYER_HEIGHT } from "./constants";
 import { drawPrincessSprite } from "./sprites";
 import { Player } from "./types";
+import { initAudio } from "./audio";
 
 interface CharacterSelectProps {
   onSelect: (index: number, customName: string) => void;
@@ -101,7 +102,7 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
             {PRINCESSES.map((p, i) => (
               <button
                 key={p.name}
-                onClick={() => setSelected(i)}
+                onClick={() => { initAudio(); setSelected(i); }}
                 className={`flex flex-col items-center gap-0 sm:gap-1 p-1.5 sm:p-3 rounded-xl border-2 transition-all cursor-pointer ${
                   selected === i
                     ? "border-yellow-400 bg-purple-800/60 scale-105 shadow-lg"
@@ -122,7 +123,7 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
 
       {/* Start button */}
       <button
-        onClick={() => onSelect(selected, customName.trim())}
+        onClick={() => { initAudio(); onSelect(selected, customName.trim()); }}
         className="px-8 sm:px-12 py-2.5 sm:py-4 text-base sm:text-xl font-bold rounded-full border-2 border-yellow-400 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
       >
         Start Adventure!
