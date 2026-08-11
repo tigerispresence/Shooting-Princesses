@@ -16,10 +16,15 @@ import {
   drawBattleCry,
   drawSuperAttack,
   getSuperShake,
+  drawEnemyProjectile,
+  drawBoss,
+  drawBossIntro,
+  drawStageClear,
 } from "./renderer";
 import TitleScreen from "./TitleScreen";
 import CharacterSelect from "./CharacterSelect";
 import TouchControls from "./TouchControls";
+import Scoreboard, { saveScore } from "./Scoreboard";
 import { initAudio, setupIOSAudioUnlock, playBGM, stopBGM, playSFX, playCharacterShoot, toggleMute, isMuted } from "./audio";
 
 export default function GameCanvas() {
@@ -32,7 +37,8 @@ export default function GameCanvas() {
   const lastSpawnRef = useRef(0);
   const animRef = useRef<number>(0);
   const selectedPrincessRef = useRef(0);
-  const [screen, setScreen] = useState<"title" | "select" | "playing">("title");
+  const [screen, setScreen] = useState<"title" | "select" | "playing" | "scoreboard">("title");
+  const [lastScore, setLastScore] = useState<number | undefined>(undefined);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [muted, setMuted] = useState(false);
   const [superReady, setSuperReady] = useState(false);
@@ -132,7 +138,8 @@ export default function GameCanvas() {
       if (e.key === "Escape") {
         const state = stateRef.current;
         if (state.gameOver) {
-          setScreen("select");
+          stopBGM();
+          setScreen("scoreboard");
           return;
         }
       }
@@ -177,13 +184,21 @@ export default function GameCanvas() {
 
       if (state.wave !== prevWaveRef.current) {
         prevWaveRef.current = state.wave;
-        playBGM(state.wave);
+        playBGM(state.stage);
       }
 
       if (state.gameOver && !gameOverSoundRef.current) {
         gameOverSoundRef.current = true;
         stopBGM();
         playSFX("gameOver");
+        saveScore({
+          name: state.player.princess.name,
+          princess: state.player.princess.name,
+          score: state.score,
+          stage: state.stage,
+          wave: state.wave,
+        });
+        setLastScore(state.score);
       }
 
       if (state.superReady !== superReady) {
@@ -194,7 +209,7 @@ export default function GameCanvas() {
         handleShoot();
       }
 
-      if (state.started && !state.gameOver && !state.waveTransition) {
+      if (state.started && !state.gameOver && !state.waveTransition && !state.bossActive && !state.stageClearing) {
         const now = Date.now();
         const spawnInterval = Math.max(600, 1500 - state.wave * 100);
         if (now - lastSpawnRef.current > spawnInterval && state.enemiesSpawned < state.enemiesInWave) {
@@ -220,13 +235,19 @@ export default function GameCanvas() {
       for (const pu of state.powerUps) drawPowerUp(ctx, pu, frame);
       for (const proj of state.projectiles) drawProjectile(ctx, proj, frame);
       for (const enemy of state.enemies) drawEnemy(ctx, enemy, frame);
+      for (const ep of state.enemyProjectiles) drawEnemyProjectile(ctx, ep, frame);
+      if (state.boss && state.bossActive) {
+        drawBoss(ctx, state.boss, frame);
+        drawBossIntro(ctx, state.boss, frame);
+      }
       for (const particle of state.particles) drawParticle(ctx, particle);
       drawPlayer(ctx, state.player, frame);
       drawHUD(ctx, state);
 
       drawSuperAttack(ctx, state, frame);
       drawBattleCry(ctx, state, frame);
-      if (state.waveTransition) drawWaveTransition(ctx, state.wave, frame);
+      drawStageClear(ctx, state, frame);
+      if (state.waveTransition) drawWaveTransition(ctx, state.wave, state.stage, frame);
       if (state.gameOver) drawGameOver(ctx, state, frame);
 
       if (shake.x !== 0 || shake.y !== 0) {
@@ -258,7 +279,11 @@ export default function GameCanvas() {
   }, [screen, handleShoot, handleSuper, startGame, isTouchDevice]);
 
   if (screen === "title") {
-    return <TitleScreen onStart={() => setScreen("select")} />;
+    return <TitleScreen onStart={() => setScreen("select")} onScoreboard={() => setScreen("scoreboard")} />;
+  }
+
+  if (screen === "scoreboard") {
+    return <Scoreboard onBack={() => setScreen("title")} highlightScore={lastScore} />;
   }
 
   if (screen === "select") {

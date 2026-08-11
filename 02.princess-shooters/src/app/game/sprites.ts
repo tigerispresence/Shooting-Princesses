@@ -2126,3 +2126,605 @@ function drawPortraitHairFront(
       break;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Boss sprites — big, cute, Kirby-villain-style bosses               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Draws one of the three boss sprites, centered at (x, y) and scaled so
+ * that `size` corresponds to roughly a 120-unit-wide design.
+ */
+export function drawBossSprite(
+  ctx: CanvasRenderingContext2D,
+  bossIndex: number,
+  x: number,
+  y: number,
+  size: number,
+  frame: number,
+  healthPercent: number
+): void {
+  const s = size / 120;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+
+  switch (bossIndex) {
+    case 0:
+      drawBossGrumblegut(ctx, frame, healthPercent);
+      break;
+    case 1:
+      drawBossGloomweave(ctx, frame, healthPercent);
+      break;
+    case 2:
+      drawBossGrumblewick(ctx, frame, healthPercent);
+      break;
+  }
+
+  ctx.restore();
+}
+
+/* --- Boss 0: Captain Grumblegut — The Grumpy Goblin General --- */
+
+function drawBossGrumblegut(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  healthPercent: number
+) {
+  const panicked = healthPercent < 0.5;
+  const bob = Math.sin(frame * 0.05) * 3;
+  const helmetWobble = Math.sin(frame * 0.1) * 0.08;
+  const swordBounce = Math.sin(frame * 0.2) * 5;
+
+  ctx.save();
+  ctx.translate(0, bob);
+
+  // Too-big sword dragging on the ground
+  ctx.strokeStyle = "#9E9E9E";
+  ctx.lineWidth = 8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(40, 10);
+  ctx.lineTo(85, 55 + swordBounce);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#757575";
+  ctx.beginPath();
+  ctx.ellipse(85, 55 + swordBounce, 10, 5, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#6D4C41";
+  ctx.fillRect(34, 4, 14, 8);
+
+  // Stubby legs in oversized boots
+  ctx.fillStyle = "#3D6B2E";
+  ctx.fillRect(-30, 45, 18, 20);
+  ctx.fillRect(12, 45, 18, 20);
+  ctx.fillStyle = "#4E342E";
+  ctx.beginPath();
+  ctx.ellipse(-21, 65, 14, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(21, 65, 14, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Round green body
+  ctx.fillStyle = "#3D6B2E";
+  ctx.beginPath();
+  ctx.ellipse(0, 5, 48, 44, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#5C8A46";
+  ctx.beginPath();
+  ctx.ellipse(0, 12, 30, 26, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Arms
+  ctx.strokeStyle = "#3D6B2E";
+  ctx.lineWidth = 14;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(28, -5);
+  ctx.quadraticCurveTo(40, 0, 38, 8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-28, -5);
+  ctx.quadraticCurveTo(-38, 5, -32, 15);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Dented chest plate armor — falls off piece by piece as health drops
+  const segPositions: [number, number, number][] = [
+    [-18, -5, -0.15],
+    [18, -5, 0.15],
+    [-14, 15, -0.05],
+    [14, 15, 0.05],
+  ];
+  const segCount = panicked ? 2 : 4;
+  ctx.fillStyle = "#B0BEC5";
+  for (let i = 0; i < segCount; i++) {
+    const [sx, sy, rot] = segPositions[i];
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#78909C";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 1.3);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.lineWidth = 1;
+
+  // Head
+  ctx.fillStyle = "#3D6B2E";
+  ctx.beginPath();
+  ctx.arc(0, -38, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Underbite with two teeth sticking up
+  ctx.fillStyle = "#2E5023";
+  ctx.beginPath();
+  ctx.ellipse(0, -20, 16, 10, 0, 0, Math.PI);
+  ctx.fill();
+  ctx.fillStyle = "#FFF9C4";
+  ctx.beginPath();
+  ctx.moveTo(-8, -22);
+  ctx.lineTo(-6, -30);
+  ctx.lineTo(-4, -22);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(4, -22);
+  ctx.lineTo(6, -30);
+  ctx.lineTo(8, -22);
+  ctx.fill();
+
+  // Eyes: tiny/angry squint normally, wide/panicked at low health
+  if (panicked) {
+    ctx.fillStyle = "#FFF";
+    ctx.beginPath();
+    ctx.ellipse(-10, -40, 6, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(10, -40, 6, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#212121";
+    ctx.beginPath();
+    ctx.arc(-10, -39, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(10, -39, 3, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = "#212121";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-14, -40);
+    ctx.lineTo(-6, -38);
+    ctx.moveTo(6, -38);
+    ctx.lineTo(14, -40);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  // Oversized rusty helmet that wobbles
+  ctx.save();
+  ctx.translate(0, -48);
+  ctx.rotate(helmetWobble);
+  ctx.fillStyle = "#8B4513";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 34, 22, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(-34, -2, 68, 14);
+  ctx.fillStyle = "#6D3410";
+  ctx.fillRect(-38, 10, 76, 7);
+  ctx.fillStyle = "#5D2E0C";
+  ctx.beginPath();
+  ctx.arc(-20, -6, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(20, -6, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#6D3410";
+  ctx.beginPath();
+  ctx.moveTo(-5, -20);
+  ctx.lineTo(0, -30);
+  ctx.lineTo(5, -20);
+  ctx.fill();
+  ctx.restore();
+
+  // Fallen armor pieces on the ground once he's rattled
+  if (panicked) {
+    ctx.fillStyle = "#90A4AE";
+    ctx.beginPath();
+    ctx.ellipse(-45, 60, 8, 5, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(48, 58, 7, 4, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/* --- Boss 1: Lady Gloomweave — The Dramatic Shadow Fairy --- */
+
+function drawBossGloomweave(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  healthPercent: number
+) {
+  const distressed = healthPercent < 0.5;
+  const wingFlap = Math.sin(frame * (distressed ? 0.24 : 0.1)) * 20;
+  const dressWave = Math.sin(frame * 0.07) * 10;
+  const glow = 0.5 + 0.5 * Math.sin(frame * 0.15);
+
+  ctx.save();
+
+  // Trailing glitter particles
+  ctx.fillStyle = `rgba(230,190,255,${0.3 + glow * 0.3})`;
+  for (let i = 0; i < 6; i++) {
+    const t = (frame * 0.06 + i * 1.1) % (Math.PI * 2);
+    const gx = -40 - i * 10 + Math.sin(t) * 6;
+    const gy = 10 + i * 4 + Math.cos(t) * 4;
+    ctx.beginPath();
+    ctx.arc(gx, gy, 2.2 - i * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Large tattered, sparkly wings
+  for (const side of [-1, 1] as const) {
+    ctx.fillStyle = "rgba(60,20,80,0.85)";
+    ctx.beginPath();
+    ctx.moveTo(side * 10, -10);
+    ctx.quadraticCurveTo(side * 55, -40 + wingFlap, side * 70, -20 + wingFlap);
+    ctx.lineTo(side * 60, wingFlap * 0.5);
+    ctx.lineTo(side * 68, 15 + wingFlap * 0.5);
+    ctx.lineTo(side * 50, 20 + wingFlap * 0.3);
+    ctx.lineTo(side * 58, 40 + wingFlap * 0.3);
+    ctx.lineTo(side * 35, 30);
+    ctx.quadraticCurveTo(side * 20, 15, side * 10, -10);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(220,180,255,${0.5 + glow * 0.4})`;
+    for (let i = 0; i < 4; i++) {
+      const sx = side * (20 + i * 10);
+      const sy = -10 + i * 8 + wingFlap * 0.3;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Exaggerated flowing dress with tattered edges
+  ctx.fillStyle = "#4B0082";
+  ctx.beginPath();
+  ctx.moveTo(-22, 10);
+  ctx.quadraticCurveTo(-30 + dressWave, 40, -34 + dressWave * 1.4, 70);
+  ctx.lineTo(-20 + dressWave * 0.6, 65);
+  ctx.lineTo(-10 + dressWave, 78);
+  ctx.lineTo(0, 62);
+  ctx.lineTo(10 - dressWave, 78);
+  ctx.lineTo(20 - dressWave * 0.6, 65);
+  ctx.lineTo(34 - dressWave * 1.4, 70);
+  ctx.quadraticCurveTo(30 - dressWave, 40, 22, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#6A0DAD";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 22, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Torso
+  ctx.fillStyle = "#4B0082";
+  ctx.beginPath();
+  ctx.ellipse(0, -5, 18, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Theatrical pose — one hand dramatically on forehead
+  ctx.strokeStyle = "#4B0082";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-14, -12);
+  ctx.quadraticCurveTo(-22, -30, -10, -38);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(14, -10);
+  ctx.quadraticCurveTo(22, -2, 18, 8);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Head
+  ctx.fillStyle = "#4B0082";
+  ctx.beginPath();
+  ctx.arc(0, -32, 16, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Glowing violet eyes with exaggerated lashes
+  ctx.fillStyle = "#B266FF";
+  ctx.shadowColor = "#B266FF";
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.ellipse(-6, -32, 3, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(6, -32, 3, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#2D0A45";
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(side * 6, -36);
+    ctx.lineTo(side * 10, -41);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(side * 8, -35);
+    ctx.lineTo(side * 13, -38);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 1;
+
+  // Glitter tear drops — more of them once she's distressed
+  const tearCount = distressed ? 3 : 1;
+  ctx.fillStyle = `rgba(200,160,255,${0.6 + glow * 0.3})`;
+  for (let i = 0; i < tearCount; i++) {
+    const drop = (frame * 1.5 + i * 20) % 40;
+    ctx.beginPath();
+    ctx.arc(-6, -28 + drop, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    if (distressed) {
+      ctx.beginPath();
+      ctx.arc(6, -28 + ((drop + 15) % 40), 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Mouth — dramatic normally, pouty once distressed
+  ctx.strokeStyle = "#2D0A45";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (distressed) {
+    ctx.arc(0, -22, 3, Math.PI * 1.2, Math.PI * 1.8);
+  } else {
+    ctx.arc(0, -25, 3, 0.2, Math.PI - 0.2);
+  }
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Dark tiara with a cracked gem
+  ctx.fillStyle = "#2D0A45";
+  ctx.beginPath();
+  ctx.moveTo(-12, -44);
+  ctx.lineTo(-13, -50);
+  ctx.lineTo(-6, -46);
+  ctx.lineTo(0, -52);
+  ctx.lineTo(6, -46);
+  ctx.lineTo(13, -50);
+  ctx.lineTo(12, -44);
+  ctx.fill();
+  ctx.fillStyle = "#8A2BE2";
+  ctx.beginPath();
+  ctx.arc(0, -47, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#1A0530";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-1.5, -49);
+  ctx.lineTo(0.5, -47);
+  ctx.lineTo(-1, -45);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.restore();
+}
+
+/* --- Boss 2: Lord Grumblewick — The Vain Wizard --- */
+
+function drawBossGrumblewick(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  healthPercent: number
+) {
+  const flustered = healthPercent < 0.5;
+  const capeBillow = Math.sin(frame * 0.05) * (flustered ? 22 : 14);
+  const starTwinkle = 0.5 + 0.5 * Math.sin(frame * 0.2);
+  const orbPulse = 0.5 + 0.5 * Math.sin(frame * 0.15);
+
+  ctx.save();
+
+  // Enormous flowing cape (tattered once he's losing his composure)
+  ctx.fillStyle = "#5C0000";
+  ctx.beginPath();
+  ctx.moveTo(-24, -20);
+  ctx.quadraticCurveTo(-70 + capeBillow, 10, -60 + capeBillow * 1.4, 60);
+  if (flustered) {
+    ctx.lineTo(-40 + capeBillow, 50);
+    ctx.lineTo(-46 + capeBillow, 66);
+    ctx.lineTo(-20 + capeBillow * 0.6, 52);
+    ctx.lineTo(-26 + capeBillow * 0.6, 68);
+    ctx.lineTo(0, 55);
+    ctx.lineTo(-6, 70);
+    ctx.lineTo(20, 55);
+  } else {
+    ctx.quadraticCurveTo(-10, 75, 0, 55);
+    ctx.quadraticCurveTo(10, 75, 20, 55);
+  }
+  ctx.quadraticCurveTo(60 - capeBillow * 0.28, 60, 60 - capeBillow, 55);
+  ctx.quadraticCurveTo(70 - capeBillow, 5, 24, -20);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#FFD700";
+  ctx.beginPath();
+  ctx.moveTo(-24, -18);
+  ctx.quadraticCurveTo(-55 + capeBillow, 8, -48 + capeBillow, 50);
+  ctx.lineTo(-42 + capeBillow, 48);
+  ctx.quadraticCurveTo(-48 + capeBillow, 10, -20, -16);
+  ctx.fill();
+
+  // Fancy staff with a glowing, pulsing orb
+  ctx.strokeStyle = "#3E2723";
+  ctx.lineWidth = 5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(38, 55);
+  ctx.lineTo(44, -35);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = `rgba(186,104,255,${0.5 + orbPulse * 0.5})`;
+  ctx.shadowColor = "#BA68FF";
+  ctx.shadowBlur = 10 + orbPulse * 10;
+  ctx.beginPath();
+  ctx.arc(44, -42, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#FFD700";
+  ctx.beginPath();
+  ctx.moveTo(38, -35);
+  ctx.lineTo(44, -30);
+  ctx.lineTo(50, -35);
+  ctx.fill();
+
+  // Robe body — dark red with gold trim
+  ctx.fillStyle = "#8B0000";
+  ctx.beginPath();
+  ctx.moveTo(-22, -18);
+  ctx.quadraticCurveTo(-30, 20, -26, 55);
+  ctx.lineTo(26, 55);
+  ctx.quadraticCurveTo(30, 20, 22, -18);
+  ctx.fill();
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-22, -18);
+  ctx.quadraticCurveTo(-30, 20, -26, 55);
+  ctx.moveTo(22, -18);
+  ctx.quadraticCurveTo(30, 20, 26, 55);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-14, 5);
+  ctx.lineTo(14, 5);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Arms
+  ctx.strokeStyle = "#8B0000";
+  ctx.lineWidth = 10;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(20, -5);
+  ctx.quadraticCurveTo(32, -10, 36, 10);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-20, -5);
+  ctx.quadraticCurveTo(-28, 5, -20, 15);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Head
+  ctx.fillStyle = "#F5C89A";
+  ctx.beginPath();
+  ctx.arc(0, -32, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Self-satisfied smirk
+  ctx.strokeStyle = "#5D3A1A";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-8, -22);
+  ctx.quadraticCurveTo(0, -18, 10, -24);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Long curly mustache — droops once he's flustered
+  const droop = flustered ? 12 : 0;
+  ctx.strokeStyle = "#E0E0E0";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(side * 4, -22);
+    ctx.bezierCurveTo(
+      side * 18, -20 + droop * 0.3,
+      side * 26, -14 + droop,
+      side * 20, -8 + droop * 1.5
+    );
+    ctx.stroke();
+  }
+  ctx.lineWidth = 1;
+
+  // Eyes
+  ctx.fillStyle = "#3E2723";
+  ctx.beginPath();
+  ctx.ellipse(-6, -34, 2, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(7, -34, 2, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Monocle — falls askew once he's flustered
+  const monocleTilt = flustered ? 0.5 : 0;
+  const monocleOffsetY = flustered ? 6 : 0;
+  ctx.save();
+  ctx.translate(7, -34 + monocleOffsetY);
+  ctx.rotate(monocleTilt);
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(5, 4);
+  ctx.quadraticCurveTo(10, 10, 8, 18);
+  ctx.stroke();
+  ctx.restore();
+  ctx.lineWidth = 1;
+
+  // Tall pointed wizard hat with a twinkling star — more bent when flustered
+  const hatBend = flustered ? 0.4 : 0.08;
+  ctx.save();
+  ctx.translate(0, -48);
+  ctx.fillStyle = "#4B0082";
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 22, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-16, 0);
+  ctx.quadraticCurveTo(
+    -4 + Math.sin(frame * 0.05) * hatBend * 20, -40,
+    6 + hatBend * 30, -70
+  );
+  ctx.quadraticCurveTo(10, -35, 16, 0);
+  ctx.fill();
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-14, -8);
+  ctx.quadraticCurveTo(0, -12, 12, -10);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = `rgba(255,215,0,${0.6 + starTwinkle * 0.4})`;
+  drawBossSparkleStar(ctx, 6 + hatBend * 30, -70, 5);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawBossSparkleStar(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - size);
+  ctx.quadraticCurveTo(sx + size * 0.2, sy - size * 0.2, sx + size, sy);
+  ctx.quadraticCurveTo(sx + size * 0.2, sy + size * 0.2, sx, sy + size);
+  ctx.quadraticCurveTo(sx - size * 0.2, sy + size * 0.2, sx - size, sy);
+  ctx.quadraticCurveTo(sx - size * 0.2, sy - size * 0.2, sx, sy - size);
+  ctx.fill();
+}

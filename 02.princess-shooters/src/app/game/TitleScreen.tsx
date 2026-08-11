@@ -6,9 +6,10 @@ import { initAudio } from "./audio";
 
 interface TitleScreenProps {
   onStart: () => void;
+  onScoreboard?: () => void;
 }
 
-export default function TitleScreen({ onStart }: TitleScreenProps) {
+export default function TitleScreen({ onStart, onScoreboard }: TitleScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
   const animRef = useRef<number>(0);
@@ -324,15 +325,33 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
     };
   }, [handleStart]);
 
+  const handleScoreboard = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    initAudio();
+    cancelAnimationFrame(animRef.current);
+    onScoreboard?.();
+  }, [onScoreboard]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        className="rounded-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 w-full max-w-4xl cursor-pointer"
-        style={{ touchAction: "none" }}
-      />
+      <div className="relative w-full max-w-4xl">
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
+          className="rounded-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 w-full cursor-pointer"
+          style={{ touchAction: "none" }}
+        />
+        {onScoreboard && (
+          <button
+            onClick={handleScoreboard}
+            onTouchEnd={(e) => { e.preventDefault(); handleScoreboard(e); }}
+            className="absolute bottom-4 right-4 px-4 py-2 text-sm font-bold rounded-full border border-purple-400/50 bg-purple-900/70 hover:bg-purple-700/70 text-yellow-300 transition-all cursor-pointer backdrop-blur-sm"
+          >
+            Hall of Fame
+          </button>
+        )}
+      </div>
     </div>
   );
 }

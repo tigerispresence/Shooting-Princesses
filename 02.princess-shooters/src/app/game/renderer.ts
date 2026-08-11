@@ -6,9 +6,11 @@ import {
   Particle,
   Star,
   PowerUp,
+  Boss,
+  EnemyProjectile,
 } from "./types";
 import { ENEMY_CONFIG, CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
-import { drawPrincessSprite, drawEnemySprite, drawPrincessPortrait } from "./sprites";
+import { drawPrincessSprite, drawEnemySprite, drawPrincessPortrait, drawBossSprite } from "./sprites";
 import { STORY } from "./story";
 
 export function drawBackground(ctx: CanvasRenderingContext2D, stars: Star[], frame: number) {
@@ -198,7 +200,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.font = "bold 16px Arial";
   ctx.fillStyle = "#B8A9E8";
   ctx.textAlign = "center";
-  ctx.fillText(`Wave ${state.wave}`, CANVAS_WIDTH / 2, 22);
+  ctx.fillText(`Stage ${state.stage} — Wave ${state.wave}`, CANVAS_WIDTH / 2, 22);
 
   ctx.fillStyle = state.player.princess.color;
   ctx.font = "bold 14px Arial";
@@ -266,50 +268,63 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
   }
 }
 
-export function drawWaveTransition(ctx: CanvasRenderingContext2D, wave: number, frame: number) {
+export function drawWaveTransition(ctx: CanvasRenderingContext2D, wave: number, stage: number, frame: number) {
   ctx.fillStyle = `rgba(0, 0, 0, ${0.4 + 0.1 * Math.sin(frame * 0.1)})`;
-  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 70, CANVAS_WIDTH, 140);
+  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 80, CANVAS_WIDTH, 160);
 
   const storyWave = STORY.waves[Math.min(wave - 1, STORY.waves.length - 1)];
+  const stageData = STORY.stages[Math.min(stage - 1, STORY.stages.length - 1)];
 
-  ctx.font = "bold 32px Arial";
+  ctx.font = "bold 14px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.fillStyle = "#B8A9E8";
+  ctx.fillText(`Stage ${stage}: ${stageData?.name || "Unknown"}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50);
+
+  ctx.font = "bold 32px Arial";
   ctx.fillStyle = `hsl(${(frame * 3) % 360}, 80%, 70%)`;
-  ctx.fillText(storyWave.title, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
+  ctx.fillText(storyWave.title, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 15);
 
   ctx.font = "16px Arial";
   ctx.fillStyle = "#FFD700";
-  ctx.fillText(storyWave.introDialogue, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 10);
+  ctx.fillText(storyWave.introDialogue, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
 
   ctx.font = "14px Arial";
   ctx.fillStyle = "#B8A9E8";
-  ctx.fillText(`Wave ${wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 40);
+  ctx.fillText(`Wave ${wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
 }
 
 export function drawGameOver(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {
   ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+  const title = state.victory ? "Victory!" : "Game Over!";
   ctx.font = "bold 48px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = `hsl(${(frame * 2) % 360}, 70%, 70%)`;
-  ctx.fillText("Game Over!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 60);
+  ctx.fillText(title, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 70);
 
   ctx.font = "bold 28px Arial";
   ctx.fillStyle = "#FFD700";
-  ctx.fillText(`Score: ${state.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+  ctx.fillText(`Score: ${state.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#B8A9E8";
+  ctx.fillText(`Stage ${state.stage} — Wave ${state.wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 15);
 
   if (state.score >= state.highScore && state.score > 0) {
     ctx.font = "bold 22px Arial";
     ctx.fillStyle = "#FF69B4";
-    ctx.fillText("New High Score!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 35);
+    ctx.fillText("New High Score!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 45);
   }
 
   ctx.font = "20px Arial";
   ctx.fillStyle = "#B8A9E8";
-  ctx.fillText("Press SPACE or Click to play again", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80);
+  ctx.fillText("Press SPACE or Click to play again", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 85);
+  ctx.font = "14px Arial";
+  ctx.fillStyle = "#9B89C8";
+  ctx.fillText("Press ESC for Hall of Fame", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 110);
 }
 
 const SUPER_ATTACK_NAMES: Record<string, string> = {
@@ -757,6 +772,147 @@ function drawCharacterSuperEffect(
 
   ctx.globalAlpha = 1;
   ctx.lineWidth = 1;
+}
+
+export function drawEnemyProjectile(ctx: CanvasRenderingContext2D, ep: EnemyProjectile, frame: number) {
+  ctx.shadowColor = ep.color;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = ep.color;
+  ctx.beginPath();
+  ctx.arc(ep.x, ep.y, ep.size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath();
+  ctx.arc(ep.x, ep.y, ep.size * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+export function drawBoss(ctx: CanvasRenderingContext2D, boss: Boss, frame: number) {
+  const stageData = STORY.stages[boss.stageIndex];
+  const accent = stageData?.boss?.accentColor || "#FFD700";
+  const healthPct = boss.health / boss.maxHealth;
+  const bob = Math.sin(frame * 0.06) * 4;
+  const shake = healthPct < 0.5 ? (Math.sin(frame * 0.5) * 3) : 0;
+
+  // Draw boss sprite
+  drawBossSprite(ctx, boss.stageIndex, boss.x + shake, boss.y + bob, boss.width, frame, healthPct);
+
+  // Boss name label
+  if (stageData?.boss) {
+    ctx.font = "bold 12px Arial";
+    ctx.textAlign = "center";
+    ctx.fillStyle = accent;
+    ctx.fillText(stageData.boss.name, boss.x + shake, boss.y + bob + boss.height * 0.5 + 15);
+  }
+
+  // Health bar
+  const barWidth = boss.width * 1.2;
+  const barHeight = 8;
+  const barX = boss.x - barWidth / 2;
+  const barY = boss.y - boss.height / 2 - 20 + bob;
+
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+
+  const hue = healthPct * 120;
+  ctx.fillStyle = `hsl(${hue}, 80%, 50%)`;
+  ctx.fillRect(barX, barY, barWidth * healthPct, barHeight);
+
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+}
+
+export function drawBossIntro(ctx: CanvasRenderingContext2D, boss: Boss, frame: number) {
+  if (boss.enterAnim >= 60) return;
+
+  const stageData = STORY.stages[boss.stageIndex];
+  if (!stageData?.boss) return;
+
+  const alpha = Math.min(1, boss.enterAnim / 20) * Math.max(0, 1 - (boss.enterAnim - 40) / 20);
+  if (alpha <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.fillRect(0, CANVAS_HEIGHT / 2 - 50, CANVAS_WIDTH, 100);
+
+  ctx.font = "bold 14px Arial";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#FF6B6B";
+  ctx.fillText("BOSS INCOMING!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 25);
+
+  ctx.font = "bold 26px Arial";
+  ctx.fillStyle = stageData.boss.color;
+  ctx.fillText(stageData.boss.name, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 5);
+
+  ctx.font = "italic 14px Arial";
+  ctx.fillStyle = "#FFD700";
+  ctx.fillText(`"${stageData.boss.introDialogue}"`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
+
+  ctx.restore();
+}
+
+export function drawStageClear(ctx: CanvasRenderingContext2D, state: GameState, frame: number) {
+  if (!state.stageClearing) return;
+
+  const alpha = Math.min(1, (3000 - state.stageClearTimer) / 500);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  if (state.victory) {
+    ctx.font = "bold 48px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = `hsl(${(frame * 3) % 360}, 80%, 70%)`;
+    ctx.fillText("VICTORY!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 60);
+
+    ctx.font = "bold 24px Arial";
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText(STORY.epilogue.slice(0, 60), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+
+    ctx.font = "20px Arial";
+    ctx.fillStyle = "#FF69B4";
+    ctx.fillText(`Final Score: ${state.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 40);
+
+    // Sparkle celebration
+    for (let i = 0; i < 12; i++) {
+      const angle = (Math.PI * 2 * i) / 12 + frame * 0.03;
+      const dist = 100 + Math.sin(frame * 0.08 + i) * 30;
+      const sx = CANVAS_WIDTH / 2 + Math.cos(angle) * dist;
+      const sy = CANVAS_HEIGHT / 2 + Math.sin(angle) * dist;
+      ctx.fillStyle = `hsl(${(i * 30 + frame * 5) % 360}, 80%, 70%)`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4 + Math.sin(frame * 0.15 + i) * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    const stageData = STORY.stages[state.stage - 1];
+    const bossName = stageData?.boss?.name || "Boss";
+    const defeatLine = stageData?.boss?.defeatDialogue || "Defeated!";
+
+    ctx.font = "bold 36px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText("STAGE CLEAR!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
+
+    ctx.font = "italic 18px Arial";
+    ctx.fillStyle = "#FF69B4";
+    ctx.fillText(`${bossName}: "${defeatLine}"`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 10);
+
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#B8A9E8";
+    ctx.fillText(`Score: ${state.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 45);
+  }
+
+  ctx.restore();
 }
 
 function drawIceCrystal(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, angle: number) {

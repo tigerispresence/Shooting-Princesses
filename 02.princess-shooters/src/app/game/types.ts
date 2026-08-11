@@ -82,6 +82,37 @@ export interface PowerUp {
   bobOffset: number;
 }
 
+export interface Boss {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  health: number;
+  maxHealth: number;
+  stageIndex: number;
+  lastShot: number;
+  phase: number;
+  enterAnim: number;
+}
+
+export interface EnemyProjectile {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  color: string;
+}
+
+export interface ScoreRecord {
+  name: string;
+  princess: string;
+  score: number;
+  stage: number;
+  wave: number;
+  date: string;
+}
+
 export interface GameState {
   player: Player;
   projectiles: Projectile[];
@@ -107,4 +138,11 @@ export interface GameState {
   superActive: boolean;
   superActiveUntil: number;
   superAnimFrame: number;
+  stage: number;
+  boss: Boss | null;
+  bossActive: boolean;
+  enemyProjectiles: EnemyProjectile[];
+  stageClearing: boolean;
+  stageClearTimer: number;
+  victory: boolean;
 }

@@ -28,6 +28,48 @@ export const STORY = {
       introDialogue: "Everything grumpy is charging — let's light it up!",
     },
   ],
+  stages: [
+    {
+      name: "The Enchanted Meadows",
+      boss: {
+        name: "Captain Grumblegut",
+        title: "The Grumpy Goblin General",
+        introDialogue: "Halt! I command... whoa, my sword!",
+        defeatDialogue: "Ow! Fine, I yield! Watch your step, too!",
+        description:
+          "A round goblin in oversized armor who trips over his own sword",
+        color: "#5B8C3E",
+        accentColor: "#8B4513",
+      },
+    },
+    {
+      name: "The Shadow Highlands",
+      boss: {
+        name: "Lady Gloomweave",
+        title: "The Dramatic Shadow Fairy",
+        introDialogue: "You dare upstage MY tragic shadow show?!",
+        defeatDialogue: "Sob! My glitter tears... how could you win!",
+        description:
+          "A theatrical dark fairy who cries glitter tears when upset",
+        color: "#4B0082",
+        accentColor: "#9370DB",
+      },
+    },
+    {
+      name: "Grumblewick's Tower",
+      boss: {
+        name: "Lord Grumblewick",
+        title: "The Vain Wizard of Grumbles",
+        introDialogue: "You stole my spotlight! Now everyone grumbles!",
+        defeatDialogue: "Fine, FINE! Un-grumbling everyone...",
+        description:
+          "A vain wizard with an enormous cape who just wanted attention",
+        color: "#8B0000",
+        accentColor: "#FFD700",
+      },
+    },
+  ],
+  // Kept for backwards compatibility with existing code paths.
   boss: {
     name: "Lord Grumblewick",
     introDialogue: "You stole my spotlight! Now everyone grumbles like ME!",
