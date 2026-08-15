@@ -1,4 +1,4 @@
-import type { Cell, Dir, Maze } from "./types";
+import type { Cell, Dir, Maze, Pos } from "./types";
 
 export const OPPOSITE: Record<Dir, Dir> = {
   up: "down",
@@ -64,6 +64,34 @@ export function generateMaze(cols: number, rows: number): Maze {
   }
 
   return maze;
+}
+
+/**
+ * Fewest steps between two cells. The maze is perfect, so this is simply the
+ * length of the only route — used to score how many moves the player wasted.
+ */
+export function shortestPathLength(maze: Maze, from: Pos, to: Pos): number {
+  const total = maze.cols * maze.rows;
+  const target = idx(maze, to.c, to.r);
+  const dist = new Int32Array(total).fill(-1);
+  const queue = [idx(maze, from.c, from.r)];
+  dist[queue[0]] = 0;
+
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head];
+    if (cur === target) return dist[cur];
+    const c = cur % maze.cols;
+    const r = Math.floor(cur / maze.cols);
+    (Object.keys(DELTA) as Dir[]).forEach((dir) => {
+      if (!canMove(maze, c, r, dir)) return;
+      const next = (r + DELTA[dir].dr) * maze.cols + (c + DELTA[dir].dc);
+      if (dist[next] === -1) {
+        dist[next] = dist[cur] + 1;
+        queue.push(next);
+      }
+    });
+  }
+  return dist[target];
 }
 
 /** True if the player can step from (c,r) in `dir` without hitting a wall. */

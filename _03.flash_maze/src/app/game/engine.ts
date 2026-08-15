@@ -1,5 +1,11 @@
 import { COLS, FLASH_MS, PEEK_MS, PEEKS_PER_MAZE, ROWS } from "./constants";
-import { DELTA, canMove, generateMaze, idx } from "./maze";
+import {
+  DELTA,
+  canMove,
+  generateMaze,
+  idx,
+  shortestPathLength,
+} from "./maze";
 import type { Dir, GameState } from "./types";
 
 export function createGame(now: number): GameState {
@@ -12,6 +18,7 @@ export function createGame(now: number): GameState {
     player: { ...start },
     start,
     exit,
+    shortest: shortestPathLength(maze, start, exit),
     phase: "ready",
     phaseStart: now,
     peekUntil: 0,
@@ -50,6 +57,28 @@ export function elapsedMs(state: GameState, now: number): number {
   if (state.phase === "ready" || state.phase === "flash") return 0;
   const end = state.phase === "won" ? state.finishedAt : now;
   return Math.max(0, end - state.darkStart);
+}
+
+/**
+ * Points, higher is better. Rewards escaping fast, without groping along
+ * walls, and without wandering past the direct route. Floors at zero so a
+ * slow run reads as "0", never as a negative number.
+ */
+export function computeScore(state: GameState): number {
+  if (state.phase !== "won") return 0;
+  const seconds = (state.finishedAt - state.darkStart) / 1000;
+  const wastedSteps = Math.max(0, state.moves - state.shortest);
+  const raw = 1000 - seconds * 10 - state.bumps * 25 - wastedSteps * 5;
+  return Math.max(0, Math.round(raw));
+}
+
+/** No bumps and not one wasted step — walked the only route straight through. */
+export function isPerfect(state: GameState): boolean {
+  return (
+    state.phase === "won" &&
+    state.bumps === 0 &&
+    state.moves === state.shortest
+  );
 }
 
 /** Drives phase transitions. Call once per frame before rendering. */

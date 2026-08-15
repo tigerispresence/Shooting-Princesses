@@ -3,15 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CANVAS_H, CANVAS_W, FLASH_MS, PEEKS_PER_MAZE } from "./constants";
 import {
+  computeScore,
   createGame,
   elapsedMs,
   flashRemaining,
+  isPerfect,
   move,
   peek,
   startFlash,
   update,
 } from "./engine";
 import { render } from "./renderer";
+import Scoreboard, {
+  loadLastName,
+  saveLastName,
+  saveScore,
+} from "./Scoreboard";
 import TouchControls from "./TouchControls";
 import type { Dir, GameState, HudState } from "./types";
 
@@ -37,6 +44,8 @@ const INITIAL_HUD: HudState = {
   bumps: 0,
   peeksLeft: PEEKS_PER_MAZE,
   elapsedMs: 0,
+  score: 0,
+  perfect: false,
 };
 
 export default function GameCanvas() {
@@ -45,8 +54,15 @@ export default function GameCanvas() {
   const hudRef = useRef<HudState>(INITIAL_HUD);
   const [hud, setHud] = useState<HudState>(INITIAL_HUD);
 
+  const [showHall, setShowHall] = useState(false);
+  // Lazy init, not an effect: the name input only renders on the win screen,
+  // so this never differs from the server's markup.
+  const [name, setName] = useState<string>(() => loadLastName());
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
   const newMaze = useCallback(() => {
     stateRef.current = createGame(performance.now());
+    setSavedAt(null);
   }, []);
 
   const doMove = useCallback((dir: Dir) => {
@@ -63,6 +79,22 @@ export default function GameCanvas() {
     const s = stateRef.current;
     if (s) peek(s, performance.now());
   }, []);
+
+  const saveRun = useCallback(() => {
+    const s = stateRef.current;
+    const trimmed = name.trim();
+    if (!s || s.phase !== "won" || trimmed.length === 0) return;
+    saveScore({
+      name: trimmed,
+      score: computeScore(s),
+      timeMs: s.finishedAt - s.darkStart,
+      moves: s.moves,
+      bumps: s.bumps,
+      perfect: isPerfect(s),
+    });
+    saveLastName(trimmed);
+    setSavedAt(Date.now());
+  }, [name]);
 
   // Game loop: state lives in a ref and is drawn every frame; only the small
   // HUD object crosses into React, and only when a displayed value changes.
@@ -94,6 +126,8 @@ export default function GameCanvas() {
           bumps: s.bumps,
           peeksLeft: s.peeksLeft,
           elapsedMs: Math.floor(elapsedMs(s, now) / 100) * 100,
+          score: computeScore(s),
+          perfect: isPerfect(s),
         };
         const prev = hudRef.current;
         if (
@@ -102,7 +136,8 @@ export default function GameCanvas() {
           next.moves !== prev.moves ||
           next.bumps !== prev.bumps ||
           next.peeksLeft !== prev.peeksLeft ||
-          next.elapsedMs !== prev.elapsedMs
+          next.elapsedMs !== prev.elapsedMs ||
+          next.score !== prev.score
         ) {
           hudRef.current = next;
           setHud(next);
@@ -119,6 +154,11 @@ export default function GameCanvas() {
     const onKey = (e: KeyboardEvent) => {
       const s = stateRef.current;
       if (!s) return;
+
+      // Typing a name into the save form must not steer the princess or start
+      // a new maze — "a" and "r" are both letters and game keys.
+      if (e.target instanceof HTMLInputElement) return;
+      if (showHall) return;
 
       const dir = KEY_DIRS[e.key];
       if (dir) {
@@ -137,7 +177,7 @@ export default function GameCanvas() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [doMove, doStart, doPeek, newMaze]);
+  }, [doMove, doStart, doPeek, newMaze, showHall]);
 
   // Swipe
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -224,20 +264,63 @@ export default function GameCanvas() {
               <button onClick={doStart} className={BIG_BTN}>
                 Start
               </button>
+              <button onClick={() => setShowHall(true)} className={SMALL_BTN}>
+                🏆 Hall of Fame
+              </button>
             </Overlay>
           )}
 
           {hud.phase === "won" && (
             <Overlay>
-              <h2 className="text-2xl font-bold text-amber-200 sm:text-3xl">
+              <h2 className="text-xl font-bold text-amber-200 sm:text-2xl">
                 You escaped! 🎉
               </h2>
-              <p className="text-sm text-purple-100 sm:text-base">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-yellow-300 tabular-nums">
+                  {hud.score}
+                </div>
+                {hud.perfect && (
+                  <div className="text-sm font-bold text-amber-200">
+                    ⭐ PERFECT RUN ⭐
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-purple-100 sm:text-sm">
                 {seconds}s · {hud.moves} steps · {hud.bumps} bumps
               </p>
-              <button onClick={newMaze} className={BIG_BTN}>
-                New maze
-              </button>
+
+              {savedAt === null ? (
+                <div className="flex w-full max-w-[15rem] flex-col items-center gap-2">
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value.slice(0, 10))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveRun();
+                    }}
+                    placeholder="Your name"
+                    aria-label="Your name"
+                    className="w-full rounded-lg border border-purple-300/30 bg-black/40 px-3 py-2 text-center text-white placeholder:text-purple-300/40 focus:border-pink-300 focus:outline-none"
+                  />
+                  <button
+                    onClick={saveRun}
+                    disabled={name.trim().length === 0}
+                    className={`${BIG_BTN} w-full disabled:opacity-40`}
+                  >
+                    Save score
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-emerald-300">Saved to the Hall! ⭐</p>
+              )}
+
+              <div className="flex gap-2">
+                <button onClick={() => setShowHall(true)} className={SMALL_BTN}>
+                  🏆 Hall of Fame
+                </button>
+                <button onClick={newMaze} className={SMALL_BTN}>
+                  New maze
+                </button>
+              </div>
             </Overlay>
           )}
         </div>
@@ -249,6 +332,8 @@ export default function GameCanvas() {
           Arrow keys or WASD · P to peek · R for a new maze
         </p>
       </div>
+
+      {showHall && <Scoreboard onBack={() => setShowHall(false)} />}
     </div>
   );
 }
@@ -256,6 +341,10 @@ export default function GameCanvas() {
 const BIG_BTN =
   "rounded-full bg-gradient-to-r from-pink-400 to-purple-400 px-8 py-3 " +
   "text-lg font-bold text-white shadow-lg active:scale-95 transition";
+
+const SMALL_BTN =
+  "rounded-full border border-purple-300/40 bg-purple-800/50 px-4 py-1.5 " +
+  "text-sm font-semibold text-purple-100 active:scale-95 transition";
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (

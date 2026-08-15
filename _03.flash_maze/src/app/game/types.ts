@@ -39,11 +39,24 @@ export interface BumpMark {
   t: number;
 }
 
+export interface ScoreRecord {
+  name: string;
+  score: number;
+  timeMs: number;
+  moves: number;
+  bumps: number;
+  /** No bumps and no wasted steps. */
+  perfect: boolean;
+  date: string;
+}
+
 export interface GameState {
   maze: Maze;
   player: Pos;
   start: Pos;
   exit: Pos;
+  /** Fewest possible steps from start to exit, for scoring wasted moves. */
+  shortest: number;
   phase: Phase;
   /** timestamp the current phase began */
   phaseStart: number;
@@ -73,4 +86,6 @@ export interface HudState {
   bumps: number;
   peeksLeft: number;
   elapsedMs: number;
+  score: number;
+  perfect: boolean;
 }
