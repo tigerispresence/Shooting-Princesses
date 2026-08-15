@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --background: #12061f;
+  --foreground: #f3e8ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* The game is always dark — there is no light mode. */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  overscroll-behavior: none;
+}
+
+/*
+ * The maze canvas is square, so capping its width by the available height
+ * keeps the whole board plus controls on screen without scrolling.
+ * `dvh` rather than `vh` so the iOS URL bar doesn't push controls off.
+ */
+.maze-box {
+  width: min(100%, calc(100dvh - 12.5rem));
+}
+
+/* Landscape phones: much less vertical room, and the layout goes side-by-side. */
+@media (max-height: 640px) {
+  .maze-box {
+    width: min(100%, calc(100dvh - 4rem));
+  }
+}
