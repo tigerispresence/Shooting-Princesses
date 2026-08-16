@@ -28,6 +28,32 @@ body {
   width: min(100%, calc(100dvh - 12.5rem));
 }
 
+/*
+ * The peek button breathes while it is actually usable, so it reads as the
+ * one thing you can still do once the lights are out. It goes flat and dim
+ * the moment the peek is spent.
+ */
+@keyframes peek-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(255, 209, 102, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 209, 102, 0.95);
+  }
+}
+
+.peek-ready {
+  animation: peek-glow 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .peek-ready {
+    animation: none;
+    box-shadow: 0 0 12px rgba(255, 209, 102, 0.75);
+  }
+}
+
 /* Landscape phones: much less vertical room, and the layout goes side-by-side. */
 @media (max-height: 640px) {
   .maze-box {

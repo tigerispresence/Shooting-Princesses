@@ -205,6 +205,7 @@ export default function GameCanvas() {
   };
 
   const seconds = (hud.elapsedMs / 1000).toFixed(1);
+  const peekReady = hud.phase === "dark" && hud.peeksLeft > 0;
 
   return (
     // Short viewports (landscape phones) put the D-pad beside the maze instead
@@ -231,8 +232,12 @@ export default function GameCanvas() {
               </span>
               <button
                 onClick={doPeek}
-                disabled={hud.phase !== "dark" || hud.peeksLeft <= 0}
-                className="rounded-lg border border-amber-200/25 bg-amber-300/20 px-3 py-1 text-amber-100 disabled:opacity-30"
+                disabled={!peekReady}
+                className={`rounded-full px-3 py-1 text-sm font-bold transition ${
+                  peekReady
+                    ? "peek-ready bg-gradient-to-b from-amber-200 to-amber-400 text-purple-950 active:scale-95"
+                    : "border border-amber-200/20 bg-amber-300/10 text-amber-100/40"
+                }`}
               >
                 👁 Peek {hud.peeksLeft}
               </button>
