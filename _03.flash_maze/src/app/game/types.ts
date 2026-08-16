@@ -31,6 +31,23 @@ export interface Pos {
  */
 export type Phase = "ready" | "flash" | "dark" | "won";
 
+/**
+ * One piece of confetti. Position is derived analytically from the time since
+ * the win rather than stepped each frame, so it never drifts and needs no
+ * per-frame state.
+ */
+export interface Confetti {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rot: number;
+  vrot: number;
+  color: string;
+  size: number;
+  round: boolean;
+}
+
 export interface BumpMark {
   c: number;
   r: number;
@@ -84,6 +101,8 @@ export interface GameState {
   discovered: Set<string>;
   /** recent bumps, drawn as a red flash that fades */
   bumpMarks: BumpMark[];
+  /** thrown from the exit the moment she escapes */
+  confetti: Confetti[];
 }
 
 /** Values mirrored into React for the HUD. */
@@ -96,4 +115,6 @@ export interface HudState {
   elapsedMs: number;
   score: number;
   perfect: boolean;
+  /** true during the victory lap, while the results panel is held back */
+  celebrating: boolean;
 }

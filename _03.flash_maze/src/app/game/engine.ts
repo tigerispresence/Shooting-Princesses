@@ -1,7 +1,11 @@
 import {
+  CELEBRATE_MS,
+  CELL,
   COLS,
+  CONFETTI_COLORS,
   FLASH_MS,
   MOVE_MS,
+  PAD,
   PEEK_MS,
   PEEKS_PER_MAZE,
   ROWS,
@@ -13,7 +17,7 @@ import {
   idx,
   shortestPathLength,
 } from "./maze";
-import type { Dir, GameState } from "./types";
+import type { Confetti, Dir, GameState } from "./types";
 
 export function createGame(now: number): GameState {
   const maze = generateMaze(COLS, ROWS);
@@ -44,6 +48,7 @@ export function createGame(now: number): GameState {
     path: [idx(maze, start.c, start.r)],
     discovered: new Set(),
     bumpMarks: [],
+    confetti: [],
   };
 }
 
@@ -172,5 +177,35 @@ export function move(state: GameState, dir: Dir, now: number): void {
   if (state.player.c === state.exit.c && state.player.r === state.exit.r) {
     state.phase = "won";
     state.finishedAt = now;
+    // Turn to face the player so she celebrates at the camera, not away.
+    state.facing = "down";
+    state.confetti = spawnConfetti(state.exit.c, state.exit.r);
   }
+}
+
+/** True while the victory lap is still playing. */
+export function isCelebrating(state: GameState, now: number): boolean {
+  return state.phase === "won" && now - state.finishedAt < CELEBRATE_MS;
+}
+
+/** A cone of confetti launched upward and outward from the exit door. */
+function spawnConfetti(exitC: number, exitR: number): Confetti[] {
+  const ox = PAD + (exitC + 0.5) * CELL;
+  const oy = PAD + (exitR + 0.5) * CELL;
+
+  return Array.from({ length: 80 }, (_, i) => {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.6;
+    const speed = 130 + Math.random() * 300;
+    return {
+      x: ox + (Math.random() - 0.5) * CELL * 0.6,
+      y: oy + (Math.random() - 0.5) * CELL * 0.4,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rot: Math.random() * Math.PI * 2,
+      vrot: (Math.random() - 0.5) * 14,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size: CELL * (0.05 + Math.random() * 0.07),
+      round: Math.random() < 0.35,
+    };
+  });
 }

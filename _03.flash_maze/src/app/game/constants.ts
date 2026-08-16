@@ -25,6 +25,24 @@ export const PEEKS_PER_MAZE = 1;
 /** How long a bumped wall glows red before fading to "discovered" dim. */
 export const BUMP_FADE_MS = 700;
 
+/**
+ * The victory lap: confetti, bursts and a cheering princess play for this long
+ * before the results panel slides in, so the win gets a moment of its own.
+ */
+export const CELEBRATE_MS = 2000;
+
+/** Downward acceleration for confetti, in canvas px per second squared. */
+export const CONFETTI_GRAVITY = 520;
+
+export const CONFETTI_COLORS = [
+  "#ff8fba",
+  "#ffd166",
+  "#7ee8fa",
+  "#c77dff",
+  "#8affc1",
+  "#fff0f6",
+];
+
 export const COLORS = {
   bg0: "#231045",
   bg1: "#12061f",

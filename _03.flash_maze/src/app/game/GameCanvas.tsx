@@ -7,6 +7,7 @@ import {
   createGame,
   elapsedMs,
   flashRemaining,
+  isCelebrating,
   isPerfect,
   move,
   peek,
@@ -46,6 +47,7 @@ const INITIAL_HUD: HudState = {
   elapsedMs: 0,
   score: 0,
   perfect: false,
+  celebrating: false,
 };
 
 export default function GameCanvas() {
@@ -128,6 +130,7 @@ export default function GameCanvas() {
           elapsedMs: Math.floor(elapsedMs(s, now) / 100) * 100,
           score: computeScore(s),
           perfect: isPerfect(s),
+          celebrating: isCelebrating(s, now),
         };
         const prev = hudRef.current;
         if (
@@ -137,7 +140,8 @@ export default function GameCanvas() {
           next.bumps !== prev.bumps ||
           next.peeksLeft !== prev.peeksLeft ||
           next.elapsedMs !== prev.elapsedMs ||
-          next.score !== prev.score
+          next.score !== prev.score ||
+          next.celebrating !== prev.celebrating
         ) {
           hudRef.current = next;
           setHud(next);
@@ -223,6 +227,12 @@ export default function GameCanvas() {
                 {hud.countdown}
               </span>
             </div>
+          ) : hud.celebrating ? (
+            <div className="flex w-full items-center justify-center">
+              <span className="cheer-banner text-lg font-bold tracking-widest text-amber-200">
+                🎉 ESCAPED! 🎉
+              </span>
+            </div>
           ) : (
             <>
               <span>⏱ {seconds}s</span>
@@ -275,7 +285,8 @@ export default function GameCanvas() {
             </Overlay>
           )}
 
-          {hud.phase === "won" && (
+          {/* Held back until the confetti has had its moment. */}
+          {hud.phase === "won" && !hud.celebrating && (
             <Overlay>
               <h2 className="text-xl font-bold text-amber-200 sm:text-2xl">
                 You escaped! 🎉
@@ -353,7 +364,7 @@ const SMALL_BTN =
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-2xl bg-black/70 backdrop-blur-sm px-4">
+    <div className="overlay-pop absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-2xl bg-black/70 px-4 backdrop-blur-sm">
       {children}
     </div>
   );

@@ -10,6 +10,8 @@ export interface PrincessPose {
   progress: number;
   /** flips each step so the feet alternate */
   stepParity: number;
+  /** celebrating the escape: hops with both arms in the air */
+  cheering?: boolean;
 }
 
 /**
@@ -31,15 +33,26 @@ export function drawPrincess(
 ): void {
   const s = size;
   const { facing, walking, progress, stepParity } = pose;
+  const cheering = pose.cheering === true;
 
   // One arch through the step: 0 at both ends, 1 at mid-stride.
   const stride = walking ? Math.sin(progress * Math.PI) : 0;
   const sideways = facing === "left" ? -1 : facing === "right" ? 1 : 0;
-  const bob = walking
-    ? -stride * s * 0.05
-    : Math.sin(t / 480) * s * 0.015;
-  const lean = sideways * stride * 0.13;
-  const breathe = 1 + Math.sin(t / 480) * 0.012;
+  // Cheering overrides everything else: quick repeated hops, squashing a
+  // little at the bottom of each one.
+  const hop = cheering ? Math.abs(Math.sin(t / 105)) : 0;
+  const bob = cheering
+    ? -hop * s * 0.16
+    : walking
+      ? -stride * s * 0.05
+      : Math.sin(t / 480) * s * 0.015;
+  const lean = cheering
+    ? Math.sin(t / 210) * 0.1
+    : sideways * stride * 0.13;
+  // Squash and stretch on the hop sells the bounce.
+  const breathe = cheering
+    ? 1 + hop * 0.07
+    : 1 + Math.sin(t / 480) * 0.012;
   // Feet swap each step so consecutive steps don't look identical.
   const leadFoot = stepParity === 0 ? 1 : -1;
 
@@ -62,7 +75,7 @@ export function drawPrincess(
 
   ctx.translate(cx, cy + bob);
   ctx.rotate(lean);
-  if (!walking) ctx.scale(1, breathe);
+  if (!walking || cheering) ctx.scale(1, breathe);
 
   const hemY = s * 0.42;
   const waistY = s * 0.04;
@@ -76,9 +89,9 @@ export function drawPrincess(
   drawBackHair(ctx, s, headY, headR, drag);
   drawSkirt(ctx, s, waistY, hemY, drag);
   drawBodice(ctx, s, shoulderY, waistY);
-  drawArms(ctx, s, shoulderY, stride, leadFoot, walking);
+  drawArms(ctx, s, shoulderY, stride, leadFoot, walking, cheering);
   drawSleeves(ctx, s, shoulderY);
-  drawHead(ctx, s, headY, headR, faceShift, facingAway, blinking);
+  drawHead(ctx, s, headY, headR, faceShift, facingAway && !cheering, blinking);
   drawTiara(ctx, s, headY, headR, faceShift);
 
   ctx.restore();
@@ -217,12 +230,35 @@ function drawArms(
   stride: number,
   leadFoot: number,
   walking: boolean,
+  cheering: boolean,
 ) {
-  // Arms swing opposite the legs, which is what sells a walk cycle.
-  const swing = walking ? stride * s * 0.07 * -leadFoot : 0;
   ctx.strokeStyle = COLORS.skin;
   ctx.lineWidth = s * 0.045;
   ctx.lineCap = "round";
+
+  if (cheering) {
+    // Both arms thrown up in a V.
+    [-1, 1].forEach((side) => {
+      ctx.beginPath();
+      ctx.moveTo(side * s * 0.11, shoulderY + s * 0.03);
+      ctx.quadraticCurveTo(
+        side * s * 0.22,
+        shoulderY - s * 0.04,
+        side * s * 0.24,
+        shoulderY - s * 0.16,
+      );
+      ctx.stroke();
+      // Hands
+      ctx.fillStyle = COLORS.skin;
+      ctx.beginPath();
+      ctx.arc(side * s * 0.24, shoulderY - s * 0.17, s * 0.032, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    return;
+  }
+
+  // Arms swing opposite the legs, which is what sells a walk cycle.
+  const swing = walking ? stride * s * 0.07 * -leadFoot : 0;
   [-1, 1].forEach((side) => {
     const offset = side === leadFoot ? swing : -swing;
     ctx.beginPath();
