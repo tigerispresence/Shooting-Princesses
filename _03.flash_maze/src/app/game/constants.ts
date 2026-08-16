@@ -12,6 +12,12 @@ export const CANVAS_H = ROWS * CELL + PAD * 2;
 /** How long the whole maze stays on screen before the lights go out. */
 export const FLASH_MS = 5000;
 
+/**
+ * How long the princess takes to walk one cell. Short on purpose — kids mash
+ * the D-pad, and anything slower than this starts to feel like input lag.
+ */
+export const MOVE_MS = 130;
+
 /** A peek re-flashes the maze briefly. */
 export const PEEK_MS = 1000;
 export const PEEKS_PER_MAZE = 1;
@@ -32,10 +38,18 @@ export const COLORS = {
   exit: "#ffd166",
   exitGlow: "#fff3c4",
   start: "#8affc1",
-  dress: "#ff8fba",
-  dressDark: "#e0699a",
+  dress: "#ffa6c9",
+  dressMid: "#ff7fae",
+  dressDark: "#d9548a",
+  dressTrim: "#fff0f6",
+  bodice: "#e85f96",
+  sash: "#ffd166",
+  gem: "#7ee8fa",
   skin: "#ffe0c9",
-  hair: "#5b3a29",
+  blush: "rgba(255, 130, 160, 0.5)",
+  hair: "#6b3f24",
+  hairLight: "#8d5a34",
   crown: "#ffd166",
+  shoe: "#ffd166",
   path: "rgba(255, 209, 102, 0.75)",
 } as const;

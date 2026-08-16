@@ -1,4 +1,11 @@
-import { COLS, FLASH_MS, PEEK_MS, PEEKS_PER_MAZE, ROWS } from "./constants";
+import {
+  COLS,
+  FLASH_MS,
+  MOVE_MS,
+  PEEK_MS,
+  PEEKS_PER_MAZE,
+  ROWS,
+} from "./constants";
 import {
   DELTA,
   canMove,
@@ -21,6 +28,12 @@ export function createGame(now: number): GameState {
     shortest: shortestPathLength(maze, start, exit),
     phase: "ready",
     phaseStart: now,
+    // Face the player on the title and memorize screens — the back of her
+    // head is a poor first impression.
+    facing: "down",
+    visualFrom: { x: start.c, y: start.r },
+    moveStart: 0,
+    stepParity: 0,
     peekUntil: 0,
     peeksLeft: PEEKS_PER_MAZE,
     moves: 0,
@@ -102,6 +115,30 @@ export function peek(state: GameState, now: number): void {
 }
 
 /**
+ * Where the princess actually is on screen, in float cell coordinates, plus
+ * how far through her current step she is. Rendering interpolates so she
+ * walks between cells instead of teleporting.
+ */
+export function playerVisual(
+  state: GameState,
+  now: number,
+): { x: number; y: number; progress: number; walking: boolean } {
+  const progress =
+    state.moveStart === 0
+      ? 1
+      : Math.min(1, (now - state.moveStart) / MOVE_MS);
+  // Smoothstep: eases out of the old cell and into the new one without the
+  // floaty overshoot a spring would give.
+  const e = progress * progress * (3 - 2 * progress);
+  return {
+    x: state.visualFrom.x + (state.player.c - state.visualFrom.x) * e,
+    y: state.visualFrom.y + (state.player.r - state.visualFrom.y) * e,
+    progress,
+    walking: progress < 1,
+  };
+}
+
+/**
  * Attempt one grid step. Walking into a wall is not a no-op: it costs a bump
  * and permanently reveals that wall, so blundering still teaches you the maze.
  */
@@ -109,6 +146,7 @@ export function move(state: GameState, dir: Dir, now: number): void {
   if (state.phase !== "dark") return;
 
   const { c, r } = state.player;
+  state.facing = dir;
 
   if (!canMove(state.maze, c, r, dir)) {
     state.bumps += 1;
@@ -116,6 +154,13 @@ export function move(state: GameState, dir: Dir, now: number): void {
     state.bumpMarks.push({ c, r, dir, t: now });
     return;
   }
+
+  // Start the next step from wherever she is *right now*, not from the cell
+  // she was leaving — otherwise mashing the D-pad makes her snap backwards.
+  const here = playerVisual(state, now);
+  state.visualFrom = { x: here.x, y: here.y };
+  state.moveStart = now;
+  state.stepParity ^= 1;
 
   state.player = { c: c + DELTA[dir].dc, r: r + DELTA[dir].dr };
   state.moves += 1;

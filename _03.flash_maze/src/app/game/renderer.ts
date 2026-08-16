@@ -6,7 +6,7 @@ import {
   COLORS,
   PAD,
 } from "./constants";
-import { isRevealed } from "./engine";
+import { isRevealed, playerVisual } from "./engine";
 import { idx } from "./maze";
 import { drawExitDoor, drawPrincess, drawStartMarker } from "./sprites";
 import type { Dir, GameState, Maze } from "./types";
@@ -190,12 +190,21 @@ export function render(
   );
 
   if (state.phase !== "ready") {
+    // Float cell coords → pixels, so she walks between cells rather than
+    // jumping a whole cell per keypress.
+    const at = playerVisual(state, now);
     drawPrincess(
       ctx,
-      centerX(state.player.c),
-      centerY(state.player.r),
-      CELL * 0.62,
+      PAD + (at.x + 0.5) * CELL,
+      PAD + (at.y + 0.5) * CELL,
+      CELL * 0.74,
       now,
+      {
+        facing: state.facing,
+        walking: at.walking,
+        progress: at.progress,
+        stepParity: state.stepParity,
+      },
     );
   }
 }

@@ -60,6 +60,14 @@ export interface GameState {
   phase: Phase;
   /** timestamp the current phase began */
   phaseStart: number;
+  /** which way she is facing, for the sprite */
+  facing: Dir;
+  /** where the walk animation started, in float cell coordinates */
+  visualFrom: { x: number; y: number };
+  /** timestamp the current step began */
+  moveStart: number;
+  /** flips every step so the feet alternate */
+  stepParity: number;
   /** peek re-flashes the maze until this timestamp */
   peekUntil: number;
   peeksLeft: number;
