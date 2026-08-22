@@ -8,7 +8,8 @@ Web games built for two 10-year-old girls. One directory per game, one git repo 
 |---|---|
 | `01.princess_maker` | empty — not started |
 | `02.princess-shooters` | live; Next.js 16; princesses riding fairytale mounts, wave shooter with 3-stage boss |
-| `_03.flash_maze` | empty — not started |
+| `_03.flash_maze` | live; Next.js 16; memorize a maze in 5 seconds, then escape in the dark |
+| `04.escape_room` | live; Next.js 16; top-down escape room, 5 puzzle rooms per stage (stage 1 「달빛 성」 done) |
 
 Git: repo root is `~/Projects/03.games`, remote `origin`, branch `main`. Each game deploys separately to Vercel from its own directory.
 
