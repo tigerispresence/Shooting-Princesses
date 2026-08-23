@@ -1,8 +1,9 @@
-import { playBell, playSfx } from "./audio";
+import { playBell, playKeypad, playSfx, playStep } from "./audio";
 import type { HeroLook } from "./constants";
 import {
   HERO,
   PROP_NAMES,
+  THEMES,
   BELL_GAP_MS,
   BELL_LEAD_MS,
   BELL_ON_MS,
@@ -291,7 +292,7 @@ function beginMove(s: GameState, nx: number, ny: number, now: number): void {
   p.ty = ny;
   p.moveAt = now;
   p.steps++;
-  playSfx("step");
+  playStep(THEMES[currentRoom(s).theme].floorStyle);
 }
 
 function tryStep(s: GameState, dir: Dir, now: number): void {
@@ -468,6 +469,7 @@ function openInspect(
   text: string,
   opts: InspectOpts = {},
 ): void {
+  playSfx("panelOpen");
   s.modal = {
     kind: "inspect",
     art: prop.art,
@@ -506,7 +508,7 @@ export function interact(s: GameState, now: number): void {
     if (def.puzzle.kind === "code") {
       s.modal = { kind: "keypad", entry: "", length: def.puzzle.slots.length, wrong: false };
       s.phase = "modal";
-      playSfx("examine");
+      playSfx("panelOpen");
       return;
     }
     playSfx("bump");
@@ -558,7 +560,7 @@ export function interact(s: GameState, now: number): void {
       answer: pz.answer,
     };
     s.phase = "modal";
-    playSfx("examine");
+    playSfx("ghostTalk");
     return;
   }
 
@@ -578,7 +580,7 @@ export function interact(s: GameState, now: number): void {
     if (slot) {
       if (!rt.digits[prop.id]) {
         rt.digits[prop.id] = slot.digit;
-        playSfx("found");
+        playSfx("pickup");
         sparkle(s, prop.tx, prop.ty, "#c8b6ff", 14);
       } else {
         playSfx("examine");
@@ -627,7 +629,7 @@ export function inspectAction(s: GameState, now: number): void {
       const chest = def.props.find((p) => p.id === pz.chestId);
       if (chest) {
         rt.examined[chest.id] = true;
-        playSfx("found");
+        playSfx("chestOpen");
         sparkle(s, chest.tx, chest.ty, "#ffd166", 22);
         openInspect(s, chest, pz.right, {
           active: true,
@@ -649,9 +651,11 @@ export function inspectAction(s: GameState, now: number): void {
 export function closeModal(s: GameState, now: number): void {
   const modal = s.modal;
   if (!modal) return;
+  if (modal.kind === "inspect" && !modal.solveOnClose) playSfx("panelClose");
   s.modal = null;
   s.phase = "playing";
   if (modal.kind === "inspect" && modal.solveOnClose) {
+    playSfx("pickup");
     solveRoom(s, now, modal.solveOnClose);
   }
 }
@@ -680,7 +684,8 @@ export function keypadPress(s: GameState, ch: string): void {
   } else if (m.entry.length < m.length) {
     m.entry += ch;
   }
-  playSfx("examine");
+  if (ch === "del") playSfx("uiBack");
+  else playKeypad(ch);
 }
 
 export function keypadSubmit(s: GameState, now: number): void {

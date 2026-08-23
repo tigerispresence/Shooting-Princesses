@@ -1,5 +1,6 @@
 "use client";
 
+import { playSfx } from "./audio";
 import type { ModalState } from "./types";
 
 type PuzzleModal = Exclude<ModalState, { kind: "inspect" }>;
@@ -43,6 +44,7 @@ export default function PuzzlePanel({
                              touch-none select-none"
                   onPointerDown={(e) => {
                     e.preventDefault();
+                    playSfx("uiTap");
                     onAnswer(i);
                   }}
                 >

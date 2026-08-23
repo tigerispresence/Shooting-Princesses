@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { playSfx } from "./audio";
 import { STAGES } from "./constants";
 import type { StageDef } from "./constants";
 import type { BestRecord } from "./storage";
@@ -91,6 +92,7 @@ export default function StageSelect({ playerName, bests, onPick, onBack }: Props
               onPointerDown={(e) => {
                 e.preventDefault();
                 if (stage.ready) onPick(stage.id);
+                else playSfx("uiBack");
               }}
             >
               <Thumb stage={stage} />

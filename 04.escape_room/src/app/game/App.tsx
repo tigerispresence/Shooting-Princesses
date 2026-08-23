@@ -4,7 +4,10 @@ import { useCallback, useState } from "react";
 import CharacterSelect from "./CharacterSelect";
 import { CHARACTERS, STAGES } from "./constants";
 import GameCanvas from "./GameCanvas";
+import SoundToggle from "./SoundToggle";
 import StageSelect from "./StageSelect";
+import { playSfx } from "./audio";
+import { stopMusic } from "./music";
 import {
   loadBest,
   loadCharacterId,
@@ -33,12 +36,14 @@ export default function App() {
    * 한 번 더 도는데, 어차피 시작 화면에서는 쓸 일이 없는 값들이다.
    */
   const goCharacter = useCallback(() => {
+    playSfx("uiConfirm");
     setCharacterId(loadCharacterId());
     setName(loadName());
     setScreen("character");
   }, []);
 
   const goStage = useCallback(() => {
+    stopMusic();
     const next: Record<number, BestRecord | null> = {};
     for (const s of STAGES) next[s.id] = loadBest(s.id);
     setBests(next);
@@ -52,37 +57,51 @@ export default function App() {
   }, [characterId, name, goStage]);
 
   const startStage = useCallback((id: number) => {
+    playSfx("uiConfirm");
     setStageId(id);
     setScreen("play");
   }, []);
 
-  if (screen === "title") return <TitleScreen onStart={goCharacter} />;
+  const shell = (children: React.ReactNode) => (
+    <>
+      <SoundToggle />
+      {children}
+    </>
+  );
+
+  if (screen === "title") return shell(<TitleScreen onStart={goCharacter} />);
 
   if (screen === "character") {
-    return (
+    return shell(
       <CharacterSelect
         selectedId={characterId}
         name={name}
         onSelect={setCharacterId}
         onName={setName}
         onConfirm={confirmCharacter}
-        onBack={() => setScreen("title")}
-      />
+        onBack={() => {
+          playSfx("uiBack");
+          setScreen("title");
+        }}
+      />,
     );
   }
 
   if (screen === "stage") {
-    return (
+    return shell(
       <StageSelect
         playerName={playerName}
         bests={bests}
         onPick={startStage}
-        onBack={() => setScreen("character")}
-      />
+        onBack={() => {
+          playSfx("uiBack");
+          setScreen("character");
+        }}
+      />,
     );
   }
 
-  return (
+  return shell(
     <GameCanvas
       // 캐릭터나 스테이지가 바뀌면 게임을 처음부터 새로 만든다
       key={`${characterId}:${stageId}`}
@@ -90,6 +109,6 @@ export default function App() {
       playerName={playerName}
       stageId={stageId}
       onExit={goStage}
-    />
+    />,
   );
 }

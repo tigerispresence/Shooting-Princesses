@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { playSfx } from "./audio";
 import { CHARACTERS } from "./constants";
 import type { CharacterDef } from "./constants";
 import { drawHeroPortrait } from "./sprites";
@@ -105,6 +106,7 @@ export default function CharacterSelect({
               }`}
               onPointerDown={(e) => {
                 e.preventDefault();
+                playSfx("uiTap");
                 onSelect(c.id);
               }}
               aria-label={`${c.name} 고르기`}

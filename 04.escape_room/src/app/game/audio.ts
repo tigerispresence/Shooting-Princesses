@@ -6,8 +6,27 @@
  * 그래서 unlock 리스너를 document에 직접 붙인다.
  */
 
+/** 바닥 재질별 발소리 */
+export type StepSound =
+  | "stone"
+  | "plank"
+  | "plated"
+  | "marble"
+  | "shingle"
+  | "water"
+  | "ice"
+  | "grass";
+
 export type SFX =
   | "step"
+  | "uiTap"
+  | "uiConfirm"
+  | "uiBack"
+  | "panelOpen"
+  | "panelClose"
+  | "ghostTalk"
+  | "pickup"
+  | "chestOpen"
   | "bump"
   | "examine"
   | "found"
@@ -27,6 +46,9 @@ interface WindowWithWebkitAudio extends Window {
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** 배경음악과 효과음을 따로 조절할 수 있게 갈래를 나눠 둔다. */
+let bgmBus: GainNode | null = null;
+let sfxBus: GainNode | null = null;
 let muted = false;
 
 function ensureCtx(): AudioContext | null {
@@ -42,8 +64,25 @@ function ensureCtx(): AudioContext | null {
   master = ctx.createGain();
   master.gain.value = muted ? 0 : 0.5;
   master.connect(ctx.destination);
+
+  // 배경음악은 효과음보다 확실히 작아야 대사와 소리가 묻히지 않는다
+  bgmBus = ctx.createGain();
+  bgmBus.gain.value = 0.34;
+  bgmBus.connect(master);
+
+  sfxBus = ctx.createGain();
+  sfxBus.gain.value = 1;
+  sfxBus.connect(master);
+
   if (ctx.state === "suspended") void ctx.resume().catch(() => {});
   return ctx;
+}
+
+/** 배경음악 모듈이 쓰는 출력. music.ts에서만 쓴다. */
+export function audioBus(): { ctx: AudioContext; bgm: GainNode } | null {
+  const c = ensureCtx();
+  if (!c || !bgmBus) return null;
+  return { ctx: c, bgm: bgmBus };
 }
 
 /** 첫 터치/클릭에서 오디오를 깨운다. 한 번 성공하면 스스로 떨어진다. */
@@ -77,6 +116,13 @@ export function setMuted(next: boolean): void {
   if (master && ctx) master.gain.setTargetAtTime(next ? 0 : 0.5, ctx.currentTime, 0.02);
 }
 
+/** 숫자 자물쇠는 누른 숫자마다 음이 달라서, 귀로도 몇 자리 눌렀는지 알 수 있다. */
+export function playKeypad(digit: string): void {
+  const n = Number(digit);
+  const freq = Number.isFinite(n) ? 440 * Math.pow(2, n / 12) : 660;
+  tone({ freq, dur: 0.08, type: "square", gain: 0.12 });
+}
+
 export function isMuted(): boolean {
   return muted;
 }
@@ -93,7 +139,7 @@ interface ToneOpts {
 
 function tone({ freq, to, dur, type = "square", gain = 0.18, delay = 0 }: ToneOpts) {
   const c = ensureCtx();
-  if (!c || !master) return;
+  if (!c || !sfxBus) return;
   const t0 = c.currentTime + delay;
   const osc = c.createOscillator();
   const g = c.createGain();
@@ -105,14 +151,14 @@ function tone({ freq, to, dur, type = "square", gain = 0.18, delay = 0 }: ToneOp
   g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   osc.connect(g);
-  g.connect(master);
+  g.connect(sfxBus);
   osc.start(t0);
   osc.stop(t0 + dur + 0.02);
 }
 
-function noise(dur: number, gain = 0.12, delay = 0) {
+function noise(dur: number, gain = 0.12, delay = 0, cutoff = 1400, highpass = false) {
   const c = ensureCtx();
-  if (!c || !master) return;
+  if (!c || !sfxBus) return;
   const len = Math.max(1, Math.floor(c.sampleRate * dur));
   const buf = c.createBuffer(1, len, c.sampleRate);
   const data = buf.getChannelData(0);
@@ -122,12 +168,53 @@ function noise(dur: number, gain = 0.12, delay = 0) {
   const g = c.createGain();
   g.gain.value = gain;
   const lp = c.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 1400;
+  lp.type = highpass ? "highpass" : "lowpass";
+  lp.frequency.value = cutoff;
   src.connect(lp);
   lp.connect(g);
-  g.connect(master);
+  g.connect(sfxBus);
   src.start(c.currentTime + delay);
+}
+
+/**
+ * 밟는 바닥에 따라 발소리가 달라진다.
+ * 물에서는 첨벙, 얼음에서는 스르륵, 철판에서는 텅 — 같은 걸음도 방마다 다르게 들린다.
+ */
+export function playStep(surface: StepSound): void {
+  switch (surface) {
+    case "stone":
+      noise(0.05, 0.05, 0, 900);
+      tone({ freq: 150, dur: 0.04, type: "triangle", gain: 0.05 });
+      break;
+    case "plank":
+      // 나무는 속이 빈 소리가 난다
+      noise(0.04, 0.035, 0, 700);
+      tone({ freq: 190, to: 150, dur: 0.07, type: "triangle", gain: 0.07 });
+      break;
+    case "plated":
+      tone({ freq: 880, to: 660, dur: 0.05, type: "square", gain: 0.05 });
+      noise(0.04, 0.03, 0, 3000, true);
+      break;
+    case "marble":
+      tone({ freq: 1250, dur: 0.035, type: "sine", gain: 0.06 });
+      noise(0.03, 0.025, 0, 4000, true);
+      break;
+    case "shingle":
+      noise(0.06, 0.05, 0, 1200);
+      break;
+    case "water":
+      // 첨벙 — 높은 쪽 잡음이 길게 흩어진다
+      noise(0.16, 0.09, 0, 1200, true);
+      tone({ freq: 420, to: 180, dur: 0.12, type: "sine", gain: 0.05 });
+      break;
+    case "ice":
+      tone({ freq: 700, to: 1500, dur: 0.09, type: "sine", gain: 0.05 });
+      noise(0.05, 0.02, 0, 5000, true);
+      break;
+    case "grass":
+      noise(0.09, 0.035, 0, 2600, true);
+      break;
+  }
 }
 
 /** 바닥 종 네 개. 각각 다른 음이라 귀로도 순서를 외울 수 있다. */
@@ -143,6 +230,44 @@ export function playSfx(name: SFX): void {
   switch (name) {
     case "step":
       noise(0.05, 0.05);
+      break;
+    case "uiTap":
+      tone({ freq: 660, dur: 0.06, type: "sine", gain: 0.12 });
+      break;
+    case "uiConfirm":
+      // 두 음 올라가며 "정했다"는 느낌
+      tone({ freq: 587.33, dur: 0.1, type: "triangle", gain: 0.16 });
+      tone({ freq: 880, dur: 0.18, type: "triangle", gain: 0.16, delay: 0.08 });
+      break;
+    case "uiBack":
+      tone({ freq: 660, dur: 0.09, type: "sine", gain: 0.12 });
+      tone({ freq: 440, dur: 0.14, type: "sine", gain: 0.12, delay: 0.07 });
+      break;
+    case "panelOpen":
+      // 확대되는 느낌 — 낮은 데서 높은 데로 훅
+      tone({ freq: 300, to: 900, dur: 0.16, type: "sine", gain: 0.1 });
+      noise(0.12, 0.04, 0, 2400, true);
+      break;
+    case "panelClose":
+      tone({ freq: 800, to: 320, dur: 0.14, type: "sine", gain: 0.09 });
+      break;
+    case "ghostTalk":
+      // 유령이 말할 때 나는 흐물흐물한 소리
+      tone({ freq: 520, to: 620, dur: 0.1, type: "sine", gain: 0.1 });
+      tone({ freq: 600, to: 500, dur: 0.12, type: "sine", gain: 0.09, delay: 0.09 });
+      tone({ freq: 560, to: 640, dur: 0.12, type: "sine", gain: 0.08, delay: 0.19 });
+      break;
+    case "pickup":
+      // 열쇠를 손에 넣는 순간 — 반짝이는 세 음
+      tone({ freq: 1046.5, dur: 0.1, type: "triangle", gain: 0.18 });
+      tone({ freq: 1318.5, dur: 0.1, type: "triangle", gain: 0.16, delay: 0.08 });
+      tone({ freq: 1567.98, dur: 0.26, type: "triangle", gain: 0.18, delay: 0.16 });
+      break;
+    case "chestOpen":
+      // 나무 뚜껑이 삐걱 열리는 소리
+      noise(0.3, 0.07, 0, 900);
+      tone({ freq: 160, to: 320, dur: 0.32, type: "sawtooth", gain: 0.07 });
+      tone({ freq: 784, dur: 0.2, type: "sine", gain: 0.1, delay: 0.24 });
       break;
     case "bump":
       tone({ freq: 150, to: 90, dur: 0.12, type: "square", gain: 0.12 });

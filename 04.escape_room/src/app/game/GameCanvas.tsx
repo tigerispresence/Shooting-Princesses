@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { setupAudioUnlock } from "./audio";
+import { playSfx, setupAudioUnlock } from "./audio";
+import { playRoomMusic, stopMusic } from "./music";
 import { CANVAS_H, CANVAS_W, STAGES, TOTAL_ROOMS } from "./constants";
 import type { HeroLook } from "./constants";
 import {
@@ -142,6 +143,19 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
     return () => cancelAnimationFrame(raf);
   }, [look, stageId]);
 
+  // 방마다 곡이 다르다. 같은 방에 머무는 동안에는 다시 틀지 않아 끊기지 않는다.
+  useEffect(() => {
+    if (hud.phase === "intro") return;
+    if (hud.phase === "stageClear") {
+      stopMusic();
+      return;
+    }
+    playRoomMusic(stageId, hud.roomIndex);
+  }, [hud.phase, hud.roomIndex, stageId]);
+
+  // 화면을 떠나면 음악도 멈춘다
+  useEffect(() => () => stopMusic(), []);
+
   // 탈출에 성공하면 기록을 남긴다
   const savedRef = useRef(false);
   useEffect(() => {
@@ -234,6 +248,8 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
             className="shrink-0 rounded-lg px-1.5 py-0.5 text-violet-300/70 active:text-violet-100 touch-none select-none"
             onPointerDown={(e) => {
               e.preventDefault();
+              playSfx("uiBack");
+              stopMusic();
               onExit();
             }}
             aria-label="스테이지 고르기로 돌아가기"
@@ -309,6 +325,7 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
                          active:bg-amber-300/45 touch-none select-none"
               onPointerDown={(e) => {
                 e.preventDefault();
+                playSfx("uiConfirm");
                 doStart();
               }}
             >
@@ -337,6 +354,7 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
                            font-bold text-amber-100 active:bg-amber-300/45 touch-none select-none"
                 onPointerDown={(e) => {
                   e.preventDefault();
+                  playSfx("uiConfirm");
                   restart();
                 }}
               >
@@ -347,6 +365,8 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
                            text-violet-100 active:bg-white/25 touch-none select-none"
                 onPointerDown={(e) => {
                   e.preventDefault();
+                  playSfx("uiBack");
+                  stopMusic();
                   onExit();
                 }}
               >

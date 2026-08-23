@@ -8,6 +8,7 @@ import { CHARACTERS } from "./constants";
 const NAME_KEY = "escape:name";
 const CHAR_KEY = "escape:character";
 const BEST_KEY = "escape:best:";
+const MUTE_KEY = "escape:muted";
 
 function read(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -25,6 +26,14 @@ function write(key: string, value: string): void {
   } catch {
     // 시크릿 모드처럼 저장이 막힌 곳에서는 그냥 넘어간다
   }
+}
+
+export function loadMuted(): boolean {
+  return read(MUTE_KEY) === "1";
+}
+
+export function saveMuted(muted: boolean): void {
+  write(MUTE_KEY, muted ? "1" : "0");
 }
 
 export function loadName(): string {
