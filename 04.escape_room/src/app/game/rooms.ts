@@ -5,11 +5,12 @@ import type { ExtraProp, RoomSpec } from "./stageData";
 import type { PropDef, RoomDef } from "./types";
 
 /**
- * 스테이지 1 「달빛 성」 — 다섯 개의 방.
+ * 다섯 스테이지의 방을 실제로 지어 내는 곳.
  *
- * 방의 벽 모양은 고정이지만, **물건 자리와 문제는 한 판마다 새로 뽑는다.**
- * 같은 스테이지를 다시 해도 촛대가 다른 구석에 서 있고, 뽀글이는 다른
- * 수수께끼를 내고, 자물쇠 숫자도 달라진다.
+ * 방의 벽 모양은 고정이지만, **지나는 순서도 물건 자리도 문제도 한 판마다
+ * 새로 뽑는다.** 같은 스테이지를 다시 해도 가운데 세 방의 순서가 바뀌고,
+ * 촛대가 다른 구석에 서 있고, 뽀글이는 다른 수수께끼를 내고, 자물쇠 숫자도
+ * 달라진다.
  *
  * layout 문자
  *   #  벽        .  바닥        S  시작 위치      D  다음 방으로 가는 문
@@ -561,10 +562,26 @@ const BUILDERS = {
   push: makePushRoom,
 } as const;
 
+/**
+ * 방을 지나는 순서를 판마다 섞는다.
+ *
+ * 첫 방과 마지막 방은 자리를 지킨다. 첫 방은 들어온 곳이고("쿵! 뒤에서 문이
+ * 잠겼어"), 마지막 방은 나가는 곳이다("마지막 문이 저기 보인다"). 옥상에서
+ * 시작해 현관에서 끝나면 탈출이 아니라 침입이 된다.
+ *
+ * 가운데 세 방은 어디에 놓여도 말이 되게 쓰여 있어서 매번 섞는다. 여섯 가지
+ * 순서가 나오고, 물건 자리·문제·자물쇠 숫자·도깨비가 나오는 문까지 이미
+ * 판마다 다르니 같은 스테이지를 다시 해도 처음 오는 곳처럼 느껴진다.
+ */
+function orderRooms(rooms: readonly RoomSpec[]): RoomSpec[] {
+  if (rooms.length < 4) return [...rooms];
+  return [rooms[0], ...shuffle(rooms.slice(1, -1)), rooms[rooms.length - 1]];
+}
+
 /** 한 판에 쓸 다섯 개의 방을 새로 뽑는다. */
 export function buildStage(stageId: number): RoomDef[] {
   const spec = STAGE_SPECS.find((s) => s.id === stageId) ?? STAGE_SPECS[0];
-  return spec.rooms.map((room) => build(() => BUILDERS[room.kind](room)));
+  return orderRooms(spec.rooms).map((room) => build(() => BUILDERS[room.kind](room)));
 }
 
 /**
