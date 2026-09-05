@@ -1,5 +1,5 @@
 import { COLS, ROWS } from "./constants";
-import { RIDDLES } from "./riddles";
+import { pickRiddles, TAG_LABEL } from "./riddles";
 import { HOLDER_TEMPLATES, STAGE_SPECS } from "./stageData";
 import type { ExtraProp, RoomSpec } from "./stageData";
 import type { PropDef, RoomDef } from "./types";
@@ -371,16 +371,32 @@ function makeOrderRoom(spec: RoomSpec): RoomDef {
 // 수수께끼 퍼즐
 // ---------------------------------------------------------------------------
 
+/** 문제를 낼 때 앞에 붙는 말. 몇 번째 문제인지 말투로도 알 수 있게. */
+const ROUND_LEAD = [
+  "자, 첫 번째 문제야!",
+  "좋아, 두 번째!",
+  "마지막 문제야. 이것만 맞히면 문이 열려!",
+];
+
 function makeQuizRoom(spec: RoomSpec): RoomDef {
   const spots = shuffle(placeableSpots(LIBRARY_ROOM));
   let i = 0;
   const next = (): Spot => spots[i++];
 
-  const riddle = pick(RIDDLES);
-  // 보기 순서도 섞는다. 늘 첫 번째가 정답이면 금방 눈치챈다.
-  const choices = shuffle([riddle.answer, ...riddle.wrong]);
   const asker = spec.askerName ?? "유령";
   const shortName = asker.split(" ").pop() ?? asker;
+  const total = spec.quizRounds ?? 2;
+  const rounds = pickRiddles(spec.quizLevel ?? "easy", total).map((r, idx) => {
+    // 보기 순서도 섞는다. 늘 첫 번째가 정답이면 금방 눈치챈다.
+    const choices = shuffle([r.answer, ...r.wrong]);
+    return {
+      tag: TAG_LABEL[r.tag],
+      question: `${shortName}: 「${ROUND_LEAD[idx] ?? "다음 문제!"}\n${r.question}」`,
+      choices,
+      answer: choices.indexOf(r.answer),
+      why: r.why,
+    };
+  });
   const [gx, gy] = next();
 
   return {
@@ -396,11 +412,10 @@ function makeQuizRoom(spec: RoomSpec): RoomDef {
     puzzle: {
       kind: "quiz",
       askerId: "poggle",
-      question: `${shortName}: 「자, 오늘의 수수께끼야!\n${riddle.question}」`,
-      choices,
-      answer: choices.indexOf(riddle.answer),
-      right: `${shortName}: 「우와, 맞았어! ${riddle.why} 똑똑한걸?」`,
-      wrong: `${shortName}: 「땡! 조건을 하나씩 다시 읽어 봐.」`,
+      asker: shortName,
+      rounds,
+      right: `${shortName}: 「${rounds.length}문제 연속 정답이라니, 정말 똑똑한걸?」`,
+      wrong: `${shortName}: 「땡! 아쉽다… 첫 문제부터 다시 가 보자.」`,
     },
   };
 }

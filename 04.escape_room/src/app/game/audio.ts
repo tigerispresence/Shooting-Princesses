@@ -38,7 +38,15 @@ export type SFX =
   | "blowOut"
   | "doorOpen"
   | "roomClear"
-  | "stageClear";
+  | "stageClear"
+  // 보스 대결
+  | "bossAppear"
+  | "bossStart"
+  | "bossThrow"
+  | "bossLand"
+  | "bossHit"
+  | "bossWin"
+  | "bossLose";
 
 interface WindowWithWebkitAudio extends Window {
   webkitAudioContext?: typeof AudioContext;
@@ -315,6 +323,44 @@ export function playSfx(name: SFX): void {
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
         tone({ freq: f, dur: 0.24, type: "square", gain: 0.16, delay: i * 0.1 }),
       );
+      break;
+    // --- 보스 대결 -------------------------------------------------------
+    case "bossAppear":
+      // 뿅— 하고 위에서 떨어지는 소리. 무섭기보다 웃겨야 한다.
+      tone({ freq: 300, to: 90, dur: 0.34, type: "sawtooth", gain: 0.16 });
+      tone({ freq: 160, to: 620, dur: 0.18, type: "square", gain: 0.12, delay: 0.3 });
+      noise(0.2, 0.08, 0.28, 800);
+      break;
+    case "bossStart":
+      // 삐— 시작 신호
+      tone({ freq: 880, dur: 0.14, type: "square", gain: 0.18 });
+      tone({ freq: 1318.5, dur: 0.26, type: "square", gain: 0.18, delay: 0.12 });
+      break;
+    case "bossThrow":
+      // 휙 — 던지는 바람 소리
+      noise(0.14, 0.06, 0, 2600, true);
+      tone({ freq: 520, to: 900, dur: 0.12, type: "sine", gain: 0.07 });
+      break;
+    case "bossLand":
+      // 툭 — 빗나간 눈덩이가 바닥에 터진다
+      noise(0.1, 0.05, 0, 1100);
+      tone({ freq: 190, to: 120, dur: 0.09, type: "triangle", gain: 0.06 });
+      break;
+    case "bossHit":
+      // 퍽! 맞았다 — 낮고 짧게, 아프게 들리지 않을 만큼만
+      noise(0.18, 0.12, 0, 700);
+      tone({ freq: 260, to: 110, dur: 0.2, type: "square", gain: 0.16 });
+      break;
+    case "bossWin":
+      // 이겼다 — 올라가는 세 음
+      [659.25, 880, 1318.5].forEach((f, i) =>
+        tone({ freq: f, dur: 0.26, type: "square", gain: 0.2, delay: i * 0.11 }),
+      );
+      break;
+    case "bossLose":
+      // 아쉽다 — 미끄러져 내려가는 소리 (혼내는 소리가 아니라 장난스럽게)
+      tone({ freq: 520, to: 200, dur: 0.4, type: "triangle", gain: 0.16 });
+      tone({ freq: 260, to: 130, dur: 0.3, type: "sine", gain: 0.1, delay: 0.18 });
       break;
     case "stageClear":
       // 짧은 승리 팡파르

@@ -32,7 +32,37 @@ export default function PuzzlePanel({
       >
         {modal.kind === "quiz" ? (
           <>
-            <p className="whitespace-pre-line text-[15px] leading-relaxed text-violet-50">
+            <div className="flex items-center justify-between gap-2">
+              <span className="rounded-full border border-violet-300/30 bg-violet-400/15 px-3 py-1 text-xs text-violet-100">
+                {modal.tag}
+              </span>
+              {/* 몇 문제를 연달아 맞혀야 하는지 눈에 보여야 포기하지 않는다 */}
+              <span className="flex items-center gap-1.5">
+                {Array.from({ length: modal.total }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      i < modal.step
+                        ? "bg-amber-300"
+                        : i === modal.step
+                          ? "bg-amber-200/60 ring-2 ring-amber-200/40"
+                          : "bg-white/15"
+                    }`}
+                  />
+                ))}
+                <span className="ml-1 text-xs text-violet-300/80">
+                  {modal.step + 1} / {modal.total}
+                </span>
+              </span>
+            </div>
+
+            {modal.feedback && (
+              <p className="mt-3 rounded-xl border border-emerald-300/30 bg-emerald-400/15 px-3 py-2 text-[13px] leading-relaxed text-emerald-100">
+                {modal.feedback}
+              </p>
+            )}
+
+            <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-violet-50">
               {modal.question}
             </p>
             <div className="mt-4 grid gap-2">

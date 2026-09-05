@@ -19,15 +19,27 @@ import {
 } from "./engine";
 import {
   drawBell,
+  drawBoss,
   drawDoor,
   drawGhost,
   drawHero,
   drawHeroCheer,
   drawMoonMark,
   drawProp,
+  drawSnowball,
   drawStarBox,
+  drawWarnTile,
   roundRect,
 } from "./sprites";
+import {
+  BOSS_FIGHT_MS,
+  BOSS_HURT_MS,
+  BOSS_MAX_HITS,
+  ballProgress,
+  bossLook,
+  countdownOf,
+} from "./boss";
+import type { BossMood } from "./sprites";
 import type { Theme } from "./constants";
 import type { GameState, PropDef } from "./types";
 
@@ -168,6 +180,97 @@ function drawRooftopSky(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.restore();
 }
 
+/** 떨어질 자리와 떨어지는 중인 눈덩이 */
+function drawIncoming(ctx: CanvasRenderingContext2D, s: GameState): void {
+  const b = s.boss;
+  if (!b) return;
+  const tint = bossLook(s.stageId).tint;
+  for (const ball of b.balls) {
+    drawWarnTile(ctx, ball.tx * TILE, ball.ty * TILE, ballProgress(ball, s.now), tint);
+  }
+  // 눈덩이는 표시 위에 그린다. 화면 위쪽에서 시작해 쭉 내려온다 —
+  // 너무 높은 데서 시작하면 던진 게 한동안 안 보여서 경고가 묻힌다.
+  for (const ball of b.balls) {
+    const k = ballProgress(ball, s.now);
+    const cx = ball.tx * TILE + TILE / 2;
+    const top = -14;
+    const land = ball.ty * TILE + TILE / 2;
+    const cy = top + (land - top) * k * k;
+    drawSnowball(ctx, cx, cy, tint, s.now);
+  }
+}
+
+/** 남은 시간 · 남은 기회 · 도깨비 이름. 대결 중에만 화면 위에 얹힌다. */
+function drawBossHud(ctx: CanvasRenderingContext2D, s: GameState): void {
+  const b = s.boss;
+  if (!b) return;
+  const look = bossLook(s.stageId);
+
+  ctx.save();
+  // 위쪽에 깔리는 띠 — 글자가 벽 무늬에 묻히지 않게
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  ctx.fillRect(0, 0, CANVAS_W, 26);
+
+  ctx.font = "bold 12px system-ui, sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  ctx.fillStyle = look.tint;
+  ctx.fillText(`👹 ${look.name}`, 8, 13);
+
+  // 남은 기회 — 하트가 줄어드는 게 제일 빨리 읽힌다
+  ctx.textAlign = "right";
+  ctx.font = "13px system-ui, sans-serif";
+  const hearts = "❤️".repeat(Math.max(0, BOSS_MAX_HITS - b.hits)) +
+    "🖤".repeat(Math.min(BOSS_MAX_HITS, b.hits));
+  ctx.fillText(hearts, CANVAS_W - 8, 13);
+
+  // 남은 시간 바
+  if (b.stage === "fight") {
+    const left = Math.max(0, 1 - (s.now - b.at) / BOSS_FIGHT_MS);
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.fillRect(0, 26, CANVAS_W, 4);
+    ctx.fillStyle = left > 0.3 ? "#8affc1" : "#ffd166";
+    ctx.fillRect(0, 26, CANVAS_W * left, 4);
+    ctx.textAlign = "center";
+    ctx.font = "bold 12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fillText(`${Math.ceil((BOSS_FIGHT_MS - (s.now - b.at)) / 1000)}초`, CANVAS_W / 2, 13);
+  }
+  ctx.restore();
+}
+
+/** 3·2·1 카운트다운과 결과 글자 */
+function drawBossBanner(ctx: CanvasRenderingContext2D, s: GameState): void {
+  const b = s.boss;
+  if (!b) return;
+  let text: string | null = null;
+  let color = "#ffd166";
+  if (b.stage === "intro") {
+    const c = countdownOf(b, s.now);
+    if (c > 0) text = String(c);
+  } else if (b.stage === "won") {
+    text = "이겼다!";
+    color = "#8affc1";
+  } else if (b.stage === "lost") {
+    text = "아쉽다!";
+    color = "#ffb4c8";
+  }
+  if (!text) return;
+
+  // 나타날 때 크게 부풀었다 제자리로 — 눈이 저절로 따라간다
+  const k = Math.min(1, (s.now - b.at) / 220);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `bold ${44 + (1 - k) * 26}px system-ui, sans-serif`;
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.strokeText(text, CANVAS_W / 2, CANVAS_H / 2);
+  ctx.fillStyle = color;
+  ctx.fillText(text, CANVAS_W / 2, CANVAS_H / 2);
+  ctx.restore();
+}
+
 export function render(ctx: CanvasRenderingContext2D, s: GameState, dpr: number): void {
   const def = currentRoom(s);
   const rt = currentRuntime(s);
@@ -244,20 +347,44 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, dpr: number)
   const p = s.player;
   // 걸음마다 다리를 바꿔 딛도록 사이클의 앞/뒤 절반을 번갈아 쓴다
   const phase = p.moveAt >= 0 ? (p.steps % 2 === 0 ? hp.t * 0.5 : hp.t * 0.5 + 0.5) : 0;
+  // 눈덩이에 맞은 직후에는 깜빡인다 — 지금 무적이라는 표시
+  const blinking =
+    s.boss !== null && s.now - s.boss.hurtAt < BOSS_HURT_MS && Math.floor(s.now / 90) % 2 === 0;
   items.push({
     sortY: hp.y / TILE,
     draw: () => {
       if (s.phase === "stageClear") drawHeroCheer(ctx, hp.x, hp.y, s.now, s.look);
-      else drawHero(ctx, hp.x, hp.y, p.dir, phase, s.now, s.look);
+      else if (!blinking) drawHero(ctx, hp.x, hp.y, p.dir, phase, s.now, s.look);
     },
   });
+
+  // 도깨비는 문 앞 허공에 떠서 아래를 내려다본다
+  if (s.boss) {
+    const b = s.boss;
+    const look = bossLook(s.stageId);
+    const mood: BossMood = b.stage === "won" ? "sad" : b.stage === "lost" ? "cheer" : "grin";
+    // 등장할 때 위에서 쿵 떨어진다
+    const drop = b.stage === "intro" ? Math.min(1, (s.now - b.at) / 420) : 1;
+    const by = -40 + (74 + 40) * drop;
+    items.push({
+      sortY: -1,
+      draw: () =>
+        drawBoss(ctx, CANVAS_W / 2, by, s.now, look.body, look.bodyDark, mood, 1.2 + 0.35 * drop),
+    });
+  }
 
   items.sort((a, b) => a.sortY - b.sortY);
   for (const it of items) it.draw();
 
   drawGloom(ctx, s, th);
   drawCandleGlow(ctx, s);
+  if (s.phase === "boss") drawIncoming(ctx, s);
   drawParticles(ctx, s);
+
+  if (s.phase === "boss") {
+    drawBossHud(ctx, s);
+    drawBossBanner(ctx, s);
+  }
 
   // 방을 통과하는 순간 하얗게 번쩍
   if (s.phase === "roomClear") {

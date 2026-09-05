@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx, setupAudioUnlock } from "./audio";
-import { playRoomMusic, stopMusic } from "./music";
+import { playBossMusic, playRoomMusic, stopMusic } from "./music";
 import { CANVAS_H, CANVAS_W, STAGES, TOTAL_ROOMS } from "./constants";
 import type { HeroLook } from "./constants";
 import {
@@ -55,6 +55,7 @@ const INITIAL_HUD: HudState = {
   modal: null,
   canResetBoxes: false,
   foundDigits: [],
+  bossWon: null,
 };
 
 function formatTime(ms: number): string {
@@ -150,7 +151,8 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
       stopMusic();
       return;
     }
-    playRoomMusic(stageId, hud.roomIndex);
+    if (hud.phase === "boss") playBossMusic(stageId);
+    else playRoomMusic(stageId, hud.roomIndex);
   }, [hud.phase, hud.roomIndex, stageId]);
 
   // 화면을 떠나면 음악도 멈춘다
@@ -313,7 +315,9 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
               <span className="text-amber-200">{playerName}</span>
               (이)가 다섯 개의 방을 지나 밖으로 나가야 해.
               <br />
-              방마다 수수께끼가 하나씩 숨어 있어!
+              방마다 수수께끼가 하나씩 숨어 있어.
+              <br />
+              가끔 문 앞에서 <span className="text-amber-200">도깨비</span>가 대결을 걸어올 거야!
             </p>
             <p className="text-xs text-violet-300/80">
               방향키나 아래 버튼으로 걷고, <b className="text-amber-200">살펴보기</b>로 물건을
@@ -344,9 +348,14 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
               <span className="text-amber-200">{playerName}</span>
               (이)가 {stageName}을 빠져나왔어. 뽀글이가 손을 흔들고 있네!
             </p>
-            <div className="mt-1 flex gap-4 text-sm text-violet-200">
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-sm text-violet-200">
               <span>⏱️ {formatTime(hud.elapsedMs)}</span>
               <span>💭 틀린 횟수 {hud.mistakes}</span>
+              {hud.bossWon !== null && (
+                <span className={hud.bossWon ? "text-amber-200" : "text-violet-300/80"}>
+                  {hud.bossWon ? "🏅 도깨비 도장 획득!" : "👹 도깨비에게 한 판 졌어"}
+                </span>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <button
@@ -409,7 +418,7 @@ export default function GameCanvas({ look, playerName, stageId, onExit }: Props)
         onInteract={doInteract}
         onResetBoxes={doReset}
         showReset={hud.canResetBoxes}
-        disabled={hud.phase !== "playing"}
+        disabled={hud.phase !== "playing" && hud.phase !== "boss"}
       />
     </div>
   );

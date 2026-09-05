@@ -242,14 +242,34 @@ function scheduleStep(
  */
 export function playRoomMusic(stageId: number, roomIndex: number): void {
   if (current && current.stage === stageId && current.room === roomIndex) return;
+  start(stageId, roomIndex, ROOM_VARIATIONS[roomIndex % ROOM_VARIATIONS.length]);
+}
 
+/** 방 번호 자리에 넣는 표. 보스 곡은 어느 방에서 나와도 같은 곡이다. */
+const BOSS_KEY = -1;
+
+/**
+ * 도깨비가 나타나면 같은 스테이지 곡을 반음 올려 훨씬 빠르게 몰아친다.
+ * 새 곡을 쓰지 않아도 "어? 음악이 달라졌다" 하고 바로 알아챈다.
+ */
+const BOSS_VARIATION = { useB: true, octave: 0, bpmMul: 1.5, arp: true, lift: 1 };
+
+export function playBossMusic(stageId: number): void {
+  if (current && current.stage === stageId && current.room === BOSS_KEY) return;
+  start(stageId, BOSS_KEY, BOSS_VARIATION);
+}
+
+function start(
+  stageId: number,
+  roomKey: number,
+  variation: (typeof ROOM_VARIATIONS)[number],
+): void {
   const bus = audioBus();
   if (!bus) return;
   const music = STAGE_MUSIC[stageId] ?? STAGE_MUSIC[1];
-  const variation = ROOM_VARIATIONS[roomIndex % ROOM_VARIATIONS.length];
 
   stopMusic();
-  current = { stage: stageId, room: roomIndex };
+  current = { stage: stageId, room: roomKey };
 
   // 4분음표를 넷으로 쪼갠 16분음표. /2로 두면 멜로디가 절반 속도로 늘어진다.
   const stepDur = 60 / (music.bpm * variation.bpmMul) / 4;
@@ -260,7 +280,7 @@ export function playRoomMusic(stageId: number, roomIndex: number): void {
   if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
     (window as unknown as Record<string, unknown>).__music = {
       stage: stageId,
-      room: roomIndex,
+      room: roomKey,
       bpm: Math.round(music.bpm * variation.bpmMul),
       lead: music.lead,
     };

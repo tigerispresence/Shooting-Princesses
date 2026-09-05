@@ -1161,3 +1161,223 @@ export function drawDoor(
 }
 
 export { star, roundRect };
+
+// ---------------------------------------------------------------------------
+// 보스 대결
+// ---------------------------------------------------------------------------
+
+export type BossMood = "grin" | "cheer" | "sad";
+
+/**
+ * 문을 막고 선 도깨비.
+ *
+ * 통통한 몸에 짧은 뿔 두 개, 커다란 눈, 뻐드렁니 하나. 열 살 아이가 보고
+ * 무서워하면 실패한 그림이다 — 뿔은 둥글리고 볼에 홍조를 넣어 "장난꾸러기"
+ * 쪽으로 확실히 밀었다.
+ *
+ * @param scale 1이면 제 크기. 등장할 때 커지는 연출에 쓴다.
+ * @param mood  grin: 대결 중 / cheer: 이겼을 때 / sad: 졌을 때
+ */
+export function drawBoss(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  t: number,
+  body: string,
+  bodyDark: string,
+  mood: BossMood,
+  scale = 1,
+): void {
+  const bob = Math.sin(t / 320) * 3;
+  const y = cy + bob;
+
+  ctx.save();
+  ctx.translate(cx, y);
+  ctx.scale(scale, scale);
+  ctx.translate(-cx, -y);
+
+  // 그림자 — 공중에 떠 있다는 걸 알려 준다
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 30, 16 - bob * 0.4, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 팔 — 몸통보다 먼저 그려서 뒤에서 뻗어 나온 것처럼 보이게 한다.
+  // 대결 중에는 신나서 위로 흔들고, 지면 축 늘어뜨린다.
+  const armUp = mood === "grin" ? Math.sin(t / 160) * 3 : 0;
+  const armY = mood === "sad" ? y + 10 : y - 8 - armUp;
+  ctx.strokeStyle = bodyDark;
+  ctx.lineWidth = 5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, y + 1);
+  ctx.lineTo(cx - 21, armY);
+  ctx.moveTo(cx + 12, y + 1);
+  ctx.lineTo(cx + 21, mood === "sad" ? y + 10 : y - 8 + armUp);
+  ctx.stroke();
+  // 주먹
+  ctx.fillStyle = bodyDark;
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(cx + sx * 21, mood === "sad" ? y + 10 : y - 8 + sx * armUp, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 뿔 — 짧고 뭉툭한 두 개. 뾰족하게 그리면 갑자기 무서워진다.
+  ctx.fillStyle = "#ffe9a8";
+  ctx.strokeStyle = "rgba(150,110,40,0.5)";
+  ctx.lineWidth = 1;
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + sx * 5, y - 11);
+    ctx.lineTo(cx + sx * 11.5, y - 11);
+    ctx.quadraticCurveTo(cx + sx * 11, y - 20, cx + sx * 8, y - 20.5);
+    ctx.quadraticCurveTo(cx + sx * 6, y - 20, cx + sx * 5, y - 11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 몸통
+  const g = ctx.createLinearGradient(cx, y - 16, cx, y + 18);
+  g.addColorStop(0, body);
+  g.addColorStop(1, bodyDark);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(cx, y, 17, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // 배에 두른 호랑이 무늬 팬티 — 도깨비의 상징
+  ctx.fillStyle = "#ffcf5c";
+  ctx.beginPath();
+  ctx.ellipse(cx, y + 11, 12, 6, 0, 0, Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(90,60,20,0.65)";
+  ctx.lineWidth = 1.2;
+  for (const dx of [-6, 0, 6]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + dx, y + 11);
+    ctx.lineTo(cx + dx + 1.5, y + 16);
+    ctx.stroke();
+  }
+
+  // 눈
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.ellipse(cx - 6, y - 4, 5, mood === "sad" ? 3 : 5.4, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 6, y - 4, 5, mood === "sad" ? 3 : 5.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#2b2140";
+  const look = mood === "cheer" ? 0 : Math.sin(t / 900) * 1.6;
+  ctx.beginPath();
+  ctx.arc(cx - 6 + look, y - 3.5, 2.4, 0, Math.PI * 2);
+  ctx.arc(cx + 6 + look, y - 3.5, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.beginPath();
+  ctx.arc(cx - 7 + look, y - 4.8, 0.9, 0, Math.PI * 2);
+  ctx.arc(cx + 5 + look, y - 4.8, 0.9, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 볼 홍조
+  ctx.fillStyle = "rgba(255,140,170,0.5)";
+  ctx.beginPath();
+  ctx.ellipse(cx - 12, y + 2, 3.2, 2.1, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 12, y + 2, 3.2, 2.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 입 — 기분에 따라 다르다
+  ctx.strokeStyle = "#2b2140";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if (mood === "sad") {
+    ctx.arc(cx, y + 9, 3.4, 1.15 * Math.PI, 1.85 * Math.PI);
+  } else {
+    ctx.arc(cx, y + 3.5, 4.2, 0.1 * Math.PI, 0.9 * Math.PI);
+  }
+  ctx.stroke();
+
+  // 뻐드렁니 하나 — 이 이빨 하나로 웃긴 얼굴이 된다
+  if (mood !== "sad") {
+    ctx.fillStyle = "#fffdf5";
+    ctx.beginPath();
+    ctx.moveTo(cx + 1.4, y + 6.6);
+    ctx.lineTo(cx + 4.4, y + 6.6);
+    ctx.lineTo(cx + 2.9, y + 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/** 도깨비가 던진 것 — 하늘에서 떨어지는 동안 그린다. */
+export function drawSnowball(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  tint: string,
+  t: number,
+): void {
+  ctx.save();
+  ctx.shadowColor = tint;
+  ctx.shadowBlur = 10;
+  const g = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 11);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(1, tint);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  // 빙글빙글 도는 무늬 — 떨어지는 게 눈에 잘 보이게
+  ctx.strokeStyle = "rgba(255,255,255,0.75)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5.5, t / 90, t / 90 + Math.PI * 1.2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * 떨어질 자리 표시.
+ *
+ * 이 그림이 이 대결의 전부다 — 여기가 안 보이면 피할 수가 없다. 그래서
+ * 그림자를 점점 진하게, 테두리를 점점 좁게 그려서 "곧 온다"를 두 가지
+ * 방법으로 동시에 알려 준다.
+ */
+export function drawWarnTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  k: number,
+  tint: string,
+): void {
+  const cx = x + TILE / 2;
+  const cy = y + TILE / 2;
+  ctx.save();
+  // 칸 전체가 물든다 — 폰 화면에서 테두리만으로는 눈에 안 들어온다
+  ctx.globalAlpha = 0.24 + 0.34 * k;
+  ctx.fillStyle = "#ff8fa8";
+  roundRect(ctx, x + 2, y + 2, TILE - 4, TILE - 4, 8);
+  ctx.fill();
+
+  // 바닥 그림자 — 눈덩이가 가까워질수록 커지고 진해진다
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = `rgba(0,0,0,${0.2 + 0.32 * k})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 6, 6 + 10 * k, 3 + 4.5 * k, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 조여드는 테두리 — 언제 떨어지는지 눈금처럼 알려 준다
+  ctx.strokeStyle = tint;
+  ctx.globalAlpha = 0.55 + 0.45 * k;
+  ctx.lineWidth = 2.4;
+  const inset = 2 + 9 * (1 - k);
+  roundRect(ctx, x + inset, y + inset, TILE - inset * 2, TILE - inset * 2, 7);
+  ctx.stroke();
+  ctx.restore();
+}

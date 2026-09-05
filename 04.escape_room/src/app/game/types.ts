@@ -7,9 +7,10 @@ export type Dir = "up" | "down" | "left" | "right";
  * playing    — 방 안에서 돌아다니는 중
  * modal      — 퀴즈/키패드 패널이 떠 있음 (React가 그림)
  * roomClear  — 문이 열리고 다음 방으로 넘어가는 연출 중
+ * boss       — 문 앞에서 도깨비가 대결을 걸어온 중
  * stageClear — 5개 방 전부 통과
  */
-export type Phase = "intro" | "playing" | "modal" | "roomClear" | "stageClear";
+export type Phase = "intro" | "playing" | "modal" | "roomClear" | "boss" | "stageClear";
 
 export type ThemeKey =
   // 1. 달빛 성
@@ -100,13 +101,30 @@ export interface OrderPuzzle {
   wrong: string;
 }
 
-/** 누군가에게 말을 걸면 수수께끼를 낸다. 4지선다. */
-export interface QuizPuzzle {
-  kind: "quiz";
-  askerId: string;
+/** 문제 하나. 4지선다. */
+export interface QuizRound {
+  /** 화면에 붙는 종류 딱지 — "🧠 논리", "🔢 숫자" 같은 것 */
+  tag: string;
   question: string;
   choices: string[];
   answer: number;
+  /** 맞혔을 때 들려주는 설명 */
+  why: string;
+}
+
+/**
+ * 누군가에게 말을 걸면 수수께끼를 낸다.
+ *
+ * 한 문제만 내면 네 개 중 하나라 찍어도 열려 버린다. 그래서 **연달아** 맞혀야
+ * 하고, 한 번 틀리면 첫 문제부터 다시 시작한다. 문제는 난이도별 통에서 종류가
+ * 겹치지 않게 뽑으므로 같은 방이라도 매번 다르다.
+ */
+export interface QuizPuzzle {
+  kind: "quiz";
+  askerId: string;
+  /** 문제 내는 이 이름. 말풍선 앞에 붙는다. */
+  asker: string;
+  rounds: QuizRound[];
   right: string;
   wrong: string;
 }
@@ -159,6 +177,40 @@ export interface Box {
   ty: number;
 }
 
+/** 격자 위의 한 칸 */
+export type Spot = [number, number];
+
+/** 보스가 던진 것 하나. landAt에 떨어져 터진다. */
+export interface Snowball {
+  tx: number;
+  ty: number;
+  /** 던진 시각 — 떨어질 때까지 남은 비율을 여기서 잰다 */
+  spawnAt: number;
+  landAt: number;
+}
+
+/**
+ * intro — 도깨비가 등장해 대사를 하고 3·2·1 카운트다운
+ * fight — 15초 동안 피하기
+ * won / lost — 결과 대사를 보여 주는 중 (둘 다 문은 열린다)
+ */
+export type BossStage = "intro" | "fight" | "won" | "lost";
+
+export interface BossState {
+  stage: BossStage;
+  /** 지금 단계가 시작된 시각 */
+  at: number;
+  /** 대결 전체가 시작된 시각. 이 시간만큼은 탈출 기록에서 빼 준다. */
+  startedAt: number;
+  /** 눈덩이가 떨어질 수 있는 칸 — 대결 시작할 때 한 번 구해 둔다 */
+  tiles: Spot[];
+  balls: Snowball[];
+  hits: number;
+  /** 마지막으로 맞은 시각. 잠깐 무적이다. */
+  hurtAt: number;
+  nextThrowAt: number;
+}
+
 export interface RoomRuntime {
   solved: boolean;
   /** 이미 살펴본 물건 */
@@ -168,6 +220,8 @@ export interface RoomRuntime {
   lit: string[];
   /** propId -> 찾아낸 숫자 */
   digits: Record<string, string>;
+  /** 수수께끼를 몇 개째 맞혔는지. 틀리면 0으로 돌아간다. */
+  quizStep: number;
   /** 정답 종 순서 (1~4) */
   seq: number[];
   /** 지금까지 맞게 밟은 개수 */
@@ -224,7 +278,18 @@ export interface InspectModal {
 }
 
 export type ModalState =
-  | { kind: "quiz"; question: string; choices: string[]; answer: number }
+  | {
+      kind: "quiz";
+      tag: string;
+      question: string;
+      choices: string[];
+      answer: number;
+      /** 지금 몇 번째 문제인지 (0부터) */
+      step: number;
+      total: number;
+      /** 앞 문제를 맞혔을 때 위에 남는 칭찬 한 줄 */
+      feedback: string | null;
+    }
   | { kind: "keypad"; entry: string; length: number; wrong: boolean }
   | InspectModal;
 
@@ -242,6 +307,8 @@ export interface Particle {
 export interface GameState {
   /** 고른 캐릭터의 색과 머리 모양 */
   look: HeroLook;
+  /** 몇 번째 스테이지인지 — 도깨비 색과 이름을 여기서 고른다 */
+  stageId: number;
   /** 이번 판에 뽑힌 다섯 개의 방 */
   defs: RoomDef[];
   phase: Phase;
@@ -263,6 +330,12 @@ export interface GameState {
   clearAt: number;
   /** 틀린 횟수 (결과 화면용) */
   mistakes: number;
+  /** 몇 번째 방의 문에서 도깨비가 튀어나오는지 (0~3). 판마다 다르다. */
+  bossRoom: number;
+  /** 대결 중이면 그 상태, 아니면 null */
+  boss: BossState | null;
+  /** 도깨비를 이겼는지. null이면 아직 안 만났다. */
+  bossWon: boolean | null;
 }
 
 export interface HudState {
@@ -280,4 +353,6 @@ export interface HudState {
   canResetBoxes: boolean;
   /** 암호 방에서 지금까지 찾아낸 숫자. 아직 못 찾은 자리는 null. */
   foundDigits: (string | null)[];
+  /** 도깨비를 이겼는지. null이면 아직 안 만났다. */
+  bossWon: boolean | null;
 }

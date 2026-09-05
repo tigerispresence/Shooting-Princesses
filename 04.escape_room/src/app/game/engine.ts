@@ -17,10 +17,13 @@ import {
   TOAST_MS,
   TOTAL_ROOMS,
 } from "./constants";
+import { BOSS_INTRO_MS, bossLook, createBoss, updateBoss } from "./boss";
 import { buildStage } from "./rooms";
 import type {
   Box,
   Dir,
+  ModalState,
+  QuizPuzzle,
   Reveal,
   GameState,
   HudState,
@@ -154,6 +157,7 @@ function initRuntime(def: RoomDef): RoomRuntime {
     keyFound: false,
     lit: [],
     digits: {},
+    quizStep: 0,
     seq: def.puzzle.kind === "sequence" ? makeSequence(def.puzzle.length) : [],
     seqInput: 0,
     seqPlayAt: -1,
@@ -184,6 +188,7 @@ export function createGame(
   const defs = buildStage(stageId);
   return {
     look,
+    stageId,
     defs,
     phase: "intro",
     roomIndex: 0,
@@ -200,6 +205,11 @@ export function createGame(
     doorOpenAt: -1,
     clearAt: -1,
     mistakes: 0,
+    // 도깨비는 한 판에 딱 한 번, 다섯 방 중 어느 문에서 나올지는 매번 다르다.
+    // 마지막 문은 빼 둔다 — 탈출 직전에 붙잡히면 김이 샌다.
+    bossRoom: Math.floor(Math.random() * (TOTAL_ROOMS - 1)),
+    boss: null,
+    bossWon: null,
   };
 }
 
@@ -550,15 +560,10 @@ export function interact(s: GameState, now: number): void {
 
   if (pz.kind === "quiz" && prop.id === pz.askerId) {
     if (rt.solved) {
-      toast(s, "뽀글이: 「잘 가~ 다음 방에서 또 보자!」", now, 2400);
+      toast(s, `${pz.asker}: 「잘 가~ 다음 방에서 또 보자!」`, now, 2400);
       return;
     }
-    s.modal = {
-      kind: "quiz",
-      question: pz.question,
-      choices: pz.choices,
-      answer: pz.answer,
-    };
+    s.modal = quizModal(pz, rt.quizStep, null);
     s.phase = "modal";
     playSfx("ghostTalk");
     return;
@@ -660,19 +665,57 @@ export function closeModal(s: GameState, now: number): void {
   }
 }
 
+/** 지금 차례의 문제를 화면에 띄울 모양으로 만든다. */
+function quizModal(pz: QuizPuzzle, step: number, feedback: string | null): ModalState {
+  const round = pz.rounds[Math.min(step, pz.rounds.length - 1)];
+  return {
+    kind: "quiz",
+    tag: round.tag,
+    question: round.question,
+    choices: round.choices,
+    answer: round.answer,
+    step,
+    total: pz.rounds.length,
+    feedback,
+  };
+}
+
+/**
+ * 수수께끼 방은 여러 문제를 **연달아** 맞혀야 열린다.
+ *
+ * 한 문제만 내면 네 개 중 하나라 찍어도 열려서 "너무 쉽다"는 말이 나왔다.
+ * 두세 문제를 이어서 맞히게 하면 찍어서 뚫릴 확률이 16분의 1, 64분의 1로
+ * 떨어진다. 대신 틀려도 잃는 건 시간뿐이라 몇 번이고 다시 도전할 수 있다.
+ */
 export function answerQuiz(s: GameState, index: number, now: number): void {
   if (!s.modal || s.modal.kind !== "quiz") return;
+  const rt = currentRuntime(s);
   const pz = currentRoom(s).puzzle;
   if (pz.kind !== "quiz") return;
-  closeModal(s, now);
-  if (index === pz.answer) {
-    playSfx("right");
-    solveRoom(s, now, `${pz.right}\n\n책장이 스르륵 밀리며 문이 열렸어!`);
-  } else {
+
+  const step = s.modal.step;
+  const round = pz.rounds[step];
+
+  if (index !== round.answer) {
+    closeModal(s, now);
     playSfx("wrong");
     s.mistakes++;
+    rt.quizStep = 0;
     toast(s, pz.wrong, now, 3200);
+    return;
   }
+
+  playSfx("right");
+  rt.quizStep = step + 1;
+
+  if (rt.quizStep < pz.rounds.length) {
+    // 문을 열기엔 아직 이르다. 설명 한 줄을 얹고 바로 다음 문제로.
+    s.modal = quizModal(pz, rt.quizStep, `⭕ 정답! ${round.why}`);
+    return;
+  }
+
+  closeModal(s, now);
+  solveRoom(s, now, `${pz.right}\n\n책장이 스르륵 밀리며 문이 열렸어!`);
 }
 
 export function keypadPress(s: GameState, ch: string): void {
@@ -709,6 +752,33 @@ export function keypadSubmit(s: GameState, now: number): void {
 // 프레임 업데이트
 // ---------------------------------------------------------------------------
 
+/**
+ * 문을 통과하는 순간 도깨비가 튀어나오는 방이면, 다음 방으로 넘어가기 전에
+ * 대결을 한 판 벌인다. 이겨도 져도 문은 열리므로 게임이 막히지는 않는다.
+ */
+function startBoss(s: GameState, now: number): void {
+  const { boss, spot } = createBoss(now, currentRoom(s), currentRuntime(s).boxes);
+  s.boss = boss;
+  s.phase = "boss";
+  s.held = null;
+  s.particles = [];
+  const p = s.player;
+  p.tx = spot[0];
+  p.ty = spot[1];
+  p.fromTx = spot[0];
+  p.fromTy = spot[1];
+  p.moveAt = -1;
+  p.dir = "down";
+  const look = bossLook(s.stageId);
+  playSfx("bossAppear");
+  toast(
+    s,
+    `${look.name}: 「히히! 문은 못 지나간다.\n${look.ball} 피하기 대결이다. 15초만 버텨 봐!」`,
+    now,
+    BOSS_INTRO_MS,
+  );
+}
+
 function advanceRoom(s: GameState, now: number): void {
   if (s.roomIndex >= TOTAL_ROOMS - 1) {
     s.phase = "stageClear";
@@ -744,7 +814,13 @@ export function update(s: GameState, now: number): void {
 
   if (s.phase === "playing" && p.moveAt < 0 && s.held) tryStep(s, s.held, now);
 
-  if (s.phase === "roomClear" && now - s.clearAt >= ROOM_CLEAR_MS) advanceRoom(s, now);
+  if (s.phase === "roomClear" && now - s.clearAt >= ROOM_CLEAR_MS) {
+    // 도깨비가 기다리는 문이면 대결을 먼저 치른다 (한 판에 한 번뿐)
+    if (s.roomIndex === s.bossRoom && s.bossWon === null) startBoss(s, now);
+    else advanceRoom(s, now);
+  }
+
+  if (s.phase === "boss" && updateBoss(s, now)) advanceRoom(s, now);
 
   if (s.toast && now >= s.toast.until) s.toast = null;
   updateParticles(s, dt);
@@ -752,6 +828,8 @@ export function update(s: GameState, now: number): void {
 
 export function elapsedMs(s: GameState): number {
   if (s.phase === "intro") return 0;
+  // 대결하는 동안에는 시계가 멈춘다. 도깨비를 만난 게 손해면 안 된다.
+  if (s.boss) return Math.max(0, s.boss.startedAt - s.startedAt);
   const end = s.phase === "stageClear" ? s.finishedAt : s.now;
   return Math.max(0, end - s.startedAt);
 }
@@ -763,7 +841,7 @@ export function toHud(s: GameState): HudState {
     phase: s.phase,
     roomIndex: s.roomIndex,
     roomName: def.name,
-    hint: def.hint,
+    hint: s.boss ? "그림자가 생긴 칸에서 얼른 비켜!" : def.hint,
     solved: rt.solved,
     doorOpen: rt.solved,
     // 초 단위로 잘라서 넘긴다 — 매 프레임 값이 바뀌면 React가 매 프레임 다시 그린다.
@@ -776,5 +854,6 @@ export function toHud(s: GameState): HudState {
       def.puzzle.kind === "code"
         ? def.puzzle.slots.map((sl) => rt.digits[sl.propId] ?? null)
         : [],
+    bossWon: s.bossWon,
   };
 }

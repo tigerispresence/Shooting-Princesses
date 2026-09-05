@@ -1,3 +1,4 @@
+import type { QuizLevel } from "./riddles";
 import type { PropArt, ThemeKey } from "./types";
 
 /**
@@ -36,6 +37,10 @@ export interface RoomSpec {
   clue?: ExtraProp;
   /** 수수께끼 퍼즐: 문제를 내는 유령 이름 */
   askerName?: string;
+  /** 수수께끼 퍼즐: 어느 난이도 통에서 문제를 뽑을지 */
+  quizLevel?: QuizLevel;
+  /** 수수께끼 퍼즐: 연달아 맞혀야 하는 문제 수 (한 문제면 찍어서 열린다) */
+  quizRounds?: number;
   /** 종소리 퍼즐: 다시 들려주는 장치 이름 */
   deviceName?: string;
   /** 숫자 자물쇠 퍼즐: 숫자를 숨겨 둘 물건의 그림 종류 */
@@ -173,9 +178,11 @@ const STAGE_1: StageSpec = {
       name: "속삭이는 도서관",
       theme: "library",
       intro: "책장 사이에서 누가 킥킥 웃는다. 유령 사서 뽀글이가 나타났어!",
-      hint: "뽀글이에게 말을 걸어 수수께끼를 풀자.",
+      hint: "뽀글이에게 말을 걸어 수수께끼 2개를 연달아 맞히자!",
       kind: "quiz",
       askerName: "유령 사서 뽀글이",
+      quizLevel: "easy",
+      quizRounds: 2,
       extras: [
         {
           id: "note2",
@@ -268,9 +275,11 @@ const STAGE_2: StageSpec = {
       name: "눅눅한 감방",
       theme: "cell",
       intro: "철컹! 감방 문이 닫혔어. 창살 너머로 유령 죄수가 빙긋 웃는다.",
-      hint: "꼬물이에게 말을 걸어 수수께끼를 풀자.",
+      hint: "꼬물이에게 말을 걸어 수수께끼 2개를 연달아 맞히자!",
       kind: "quiz",
       askerName: "유령 죄수 꼬물이",
+      quizLevel: "mid",
+      quizRounds: 2,
       extras: [
         {
           id: "note2a",
@@ -407,9 +416,11 @@ const STAGE_3: StageSpec = {
       name: "젖은 서고",
       theme: "wetShelf",
       intro: "책들이 퉁퉁 불었어. 책장 뒤에서 물방울 요정이 빼꼼 내다본다.",
-      hint: "또랑이에게 말을 걸어 수수께끼를 풀자.",
+      hint: "또랑이에게 말을 걸어 수수께끼 3개를 연달아 맞히자!",
       kind: "quiz",
       askerName: "물방울 요정 또랑이",
+      quizLevel: "mid",
+      quizRounds: 3,
       extras: [
         {
           id: "note3b",
@@ -524,9 +535,11 @@ const STAGE_4: StageSpec = {
       name: "눈사람 광장",
       theme: "snowyard",
       intro: "눈사람이 잔뜩! 그중 하나가 갑자기 눈을 깜빡였어.",
-      hint: "눈사람에게 말을 걸어 수수께끼를 풀자.",
+      hint: "눈사람에게 말을 걸어 수수께끼 3개를 연달아 맞히자!",
       kind: "quiz",
       askerName: "말하는 눈사람 도리",
+      quizLevel: "hard",
+      quizRounds: 3,
       extras: [
         {
           id: "note4c",
@@ -650,9 +663,11 @@ const STAGE_5: StageSpec = {
       name: "요정 연못",
       theme: "pond",
       intro: "연못 한가운데 연잎 위에 요정이 앉아 있어. 널 기다린 눈치야.",
-      hint: "요정에게 말을 걸어 수수께끼를 풀자.",
+      hint: "요정에게 말을 걸어 수수께끼 3개를 연달아 맞히자!",
       kind: "quiz",
       askerName: "연못 요정 하늘이",
+      quizLevel: "hard",
+      quizRounds: 3,
       extras: [
         {
           id: "note5c",
