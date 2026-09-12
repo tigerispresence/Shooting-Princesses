@@ -72,7 +72,7 @@ export default function TitleScreen({ look, savedName, onStart, onContinue }: Pr
       {savedName ? (
         <>
           <p className="text-base font-bold text-violet-100">
-            {savedName}아, 또 왔구나!
+            서연, 서정이 또 왔구나!
           </p>
           <button
             className="press-pulse rounded-3xl border-2 border-amber-200 bg-amber-300/35 px-10 py-4
