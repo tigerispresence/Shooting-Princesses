@@ -1,0 +1,481 @@
+/**
+ * 「학교 좀비, 살아남자!」 타입 정의.
+ *
+ * 좌표는 전부 픽셀(float). 타일 격자는 맵을 손으로 그리기 위한 것이고,
+ * 캐릭터는 원형 충돌체로 자유롭게 움직인다 (DESIGN.md §0).
+ */
+
+/** 화면 흐름 단계 */
+export type Phase =
+  | "playing"
+  | "sleeping" // 잡혀서 같이 잠든 연출 중
+  | "ritual" // 5-1 해독제 조합 연출
+  | "stageClear";
+
+/** 잠든 연출의 변주 — 누구에게 잡혔는가 */
+export type SleepKind = "pillow" | "matron" | "boss" | "buddy";
+
+export type ZombieKind = "basic" | "hungry" | "matron";
+
+export type ZombieState =
+  | "patrol"
+  | "notice"
+  | "chase"
+  | "investigate"
+  | "stall";
+
+export interface Vec {
+  x: number;
+  y: number;
+}
+
+/** 한 칸의 성질. 맵을 파싱할 때 미리 계산해 둔다. */
+export interface TileInfo {
+  /** 통과 불가 */
+  solid: boolean;
+  /** 시야를 막는다 */
+  blocksSight: boolean;
+  /** 숨을 수 있는 사물함 */
+  locker: boolean;
+  /** 잠글 수 있는 문 */
+  door: boolean;
+  /** 복도 바닥(회색 리놀륨). false면 방 바닥 */
+  corridor: boolean;
+  /** 출구 계단 */
+  exit: boolean;
+  /** 기둥 (교장 연설을 막는다) */
+  pillar: boolean;
+  /** 방송실 문 */
+  broadcast: boolean;
+  /** 과학실 비커 */
+  beaker: boolean;
+  /** 장식용 분필 더미 */
+  chalkPile: boolean;
+  /** 어느 방에 속하는가 (rooms 배열의 인덱스, 없으면 -1) */
+  room: number;
+}
+
+export interface RoomDef {
+  /** 타일 좌표 */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  name: string;
+  floor: string;
+  wall: string;
+  /** 어두운 방이면 손전등이 필요하다 */
+  dark?: boolean;
+  /** 야외 — 벽 대신 펜스, 하늘 배경 */
+  outdoor?: boolean;
+}
+
+/** 스테이지 안의 한 구역 = 체크포인트 */
+export interface SectionDef {
+  /** 화면에 뜨는 이름 (예: "1-2 보건실") */
+  label: string;
+  /** 처음 들어갈 때 한 번 나오는 무전 */
+  radio: string;
+  /** 구역을 판정하는 타일 사각형 */
+  zone: { x: number; y: number; w: number; h: number };
+  /** 여기서 재개한다 (타일 좌표, 소수점 가능) */
+  spawn: Vec;
+}
+
+export interface MatronPath {
+  /** 타일 좌표 웨이포인트 루프 */
+  points: Vec[];
+  /**
+   * 이 재료(전역 인덱스)를 주울 때까지는 제자리에서 하품만 한다.
+   * 스테이지 2 아주머니는 분필을 줍는 순간 순찰을 시작한다 — 「구역당 새 요소 하나」를 지키기 위함.
+   */
+  wakeOnIngredient?: number;
+}
+
+export interface StageDef {
+  id: number;
+  /** 「1. 점심시간 끝」 */
+  title: string;
+  /** 타이틀 카드 부제 */
+  subtitle: string;
+  par: number;
+  renderScale: number;
+  patrolSpeed: number;
+  chaseSpeed: number;
+  noticeR: number;
+  noticeDelay: number;
+  giveupMs: number;
+  /** 시작할 때 손에 쥐고 있는 알람시계 */
+  startAlarms: number;
+  rooms: RoomDef[];
+  sections: SectionDef[];
+  matronPaths: MatronPath[];
+  /** 배고픈 좀비(`Z`)의 손으로 찍은 경로 — 급식 테이블 뒤를 지나야 한다 */
+  hungryPath?: MatronPath;
+  /** 이 스테이지에서 얻는 재료 두 개 (전역 재료 인덱스 0~7) */
+  ingredients: [number, number];
+  /** ASCII 맵에서 재료를 나타내는 글자 */
+  ingredientChars: [string, string];
+  /** 급식표 조각 전역 인덱스 (0~9) */
+  menuPieces: [number, number];
+  map: string[];
+}
+
+export interface MapData {
+  w: number;
+  h: number;
+  tiles: TileInfo[];
+  rooms: RoomDef[];
+  raw: string[];
+}
+
+export interface Look {
+  hair: number;
+  cloth: number;
+  hat: string | null;
+}
+
+export interface Player {
+  x: number;
+  y: number;
+  /** 바라보는 방향 (라디안) */
+  face: number;
+  /** 걷는 애니메이션용 */
+  walkT: number;
+  moving: boolean;
+  /** 숨어 있는 사물함 타일 인덱스 (없으면 -1) */
+  hiding: number;
+  /** 문을 여닫는 중 (0~1) */
+  hideT: number;
+  hideDir: 1 | -1;
+  /** 사물함에 들어가기 직전 자리 — 나올 때 여기로 돌려놓는다 */
+  hideFrom: Vec;
+  torchOn: boolean;
+  alarms: number;
+  chalkCd: number;
+  /** 사물함별 재진입 쿨다운 */
+  lockerCd: Map<number, number>;
+}
+
+export interface Zombie {
+  id: number;
+  kind: ZombieKind;
+  x: number;
+  y: number;
+  r: number;
+  patrolSpeed: number;
+  chaseSpeed: number;
+  noticeR: number;
+  noticeDelay: number;
+  giveupMs: number;
+  state: ZombieState;
+  /** 상태 타이머 (ms) */
+  t: number;
+  /** 순찰 경로 (픽셀 좌표) */
+  path: Vec[];
+  pathIndex: number;
+  /** 경로를 앞으로 도는가 뒤로 도는가 */
+  dir: 1 | -1;
+  /** 웨이포인트에서 하품하며 멈춰 있는 시간 */
+  pauseT: number;
+  /** 마지막으로 본 곳 */
+  lastSeen: Vec | null;
+  /** investigate 목적지 */
+  goal: Vec | null;
+  /** 목적지까지의 길 (BFS 결과) */
+  route: Vec[];
+  routeAt: number;
+  /** 다음 길찾기까지 남은 시간 */
+  repathT: number;
+  /** stall 남은 시간 */
+  stallT: number;
+  /** 하품 소리 타이머 */
+  yawnT: number;
+  /** 아슬아슬 판정용 */
+  nearArmed: boolean;
+  nearCd: number;
+  /** 시작 위치 (재시작 때 되돌린다) */
+  home: Vec;
+  /** 순찰 경로에서 웨이포인트인 노드 인덱스 */
+  stops: number[];
+  /** 몸통 흔들림 */
+  bob: number;
+  /** 국자 소리 타이머 */
+  clankT: number;
+  /** 순찰 경로를 만들 때 쓰는 씨앗 — 같으면 항상 같은 길 */
+  seed: number;
+  /** 손으로 찍은 고정 웨이포인트 (아주머니 · 배고픈 좀비) */
+  routePoints: Vec[] | null;
+  /** 이 재료를 주울 때까지 제자리에서 하품만 한다 */
+  wakeOnIngredient: number | null;
+  dormant: boolean;
+  /** 문 두드리기 쿨다운 */
+  knockCd: number;
+  /**
+   * 개체 변주 (기본 좀비 전용, DESIGN §12-A).
+   * 실루엣과 색은 절대 안 건드린다 — 박자와 윤곽선 **안쪽** 그림만 다르다.
+   */
+  variant: 0 | 1 | 2;
+  /** 뒤뚱임·하품 위상 오프셋 (0~2π) */
+  phase: number;
+  /** 뒤뚱임 진폭 배율 (0.85~1.15) */
+  bobAmp: number;
+}
+
+export interface Friend {
+  id: number;
+  /** FRIENDS 배열 인덱스 */
+  who: number;
+  x: number;
+  y: number;
+  home: Vec;
+  /** "asleep" = 아직 못 깨움, "follow" = 따라오는 중 */
+  state: "asleep" | "follow" | "down";
+  /** 깨우는 중 진행도 (0~1) */
+  wakeT: number;
+  /** 줄줄이 따라오는 순서 */
+  order: number;
+  /** 따라다닌 자취 */
+  trail: Vec[];
+  bob: number;
+  /** 이번 판에 점수를 줬는가 */
+  scored: boolean;
+}
+
+export interface ItemEnt {
+  kind: "ingredient" | "menu" | "alarm";
+  /** ingredient면 0~7, menu면 0~9 */
+  index: number;
+  x: number;
+  y: number;
+  taken: boolean;
+  /** 반짝임 위상 */
+  ph: number;
+}
+
+export interface Chalk {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  traveled: number;
+  landed: boolean;
+  /** 착지 후 파문 애니메이션 */
+  t: number;
+  spin: number;
+}
+
+export interface Alarm {
+  x: number;
+  y: number;
+  /** 울리기 전 대기 → 울림 */
+  t: number;
+  ringing: boolean;
+  done: boolean;
+}
+
+export interface Door {
+  /** 타일 인덱스 */
+  tile: number;
+  x: number;
+  y: number;
+  /** 남은 잠금 시간 (ms) */
+  lockT: number;
+  uses: number;
+  /** 잠그는 중 (0~1) */
+  castT: number;
+  /** 좀비가 두드리는 연출 */
+  knockT: number;
+}
+
+export type BossPhase = "walk" | "windup" | "speech" | "recover";
+
+export interface Boss {
+  x: number;
+  y: number;
+  phase: BossPhase;
+  t: number;
+  /** 연설 반경 (0 → 200) */
+  radius: number;
+  line: string;
+  lineIndex: number;
+  active: boolean;
+  bob: number;
+  home: Vec;
+}
+
+export interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+  kind: "spark" | "dust" | "zzz" | "star" | "heart";
+}
+
+export interface Floater {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  life: number;
+}
+
+/** 재료 아이콘이 하단 줄로 날아가는 연출 */
+export interface FlyIcon {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  t: number;
+  index: number;
+}
+
+export interface StageScore {
+  ingredients: number;
+  menus: number;
+  friends: number;
+  clear: number;
+  time: number;
+  stealth: number;
+  fresh: number;
+  nearMiss: number;
+  total: number;
+  stars: number;
+}
+
+export interface GameState {
+  stageId: number;
+  stage: StageDef;
+  map: MapData;
+  phase: Phase;
+  /** 일시정지 (React가 켜고 끈다) */
+  paused: boolean;
+  player: Player;
+  zombies: Zombie[];
+  friends: Friend[];
+  items: ItemEnt[];
+  chalks: Chalk[];
+  alarms: Alarm[];
+  doors: Door[];
+  boss: Boss | null;
+  particles: Particle[];
+  floaters: Floater[];
+  flyIcons: FlyIcon[];
+  camera: Vec;
+  /** 현재 구역 (0~2) */
+  section: number;
+  visited: boolean[];
+  /** 체크포인트 좌표 */
+  checkpoint: Vec;
+  /** 흐른 시간 (ms) */
+  elapsed: number;
+  score: number;
+  /** 이번 판에 모은 것들 */
+  gotIngredients: boolean[];
+  gotMenus: boolean[];
+  /** 스테이지 시작부터 한 번도 `!`가 안 떴는가 */
+  neverSpotted: boolean;
+  /** 이번 스테이지에서 잔 횟수 */
+  sleeps: number;
+  sleepKind: SleepKind;
+  sleepLine: string;
+  /** 잠든 연출 타이머 */
+  sleepT: number;
+  /** 출구가 열렸는가 */
+  exitOpen: boolean;
+  /** 방송 게이지 (ms, 최대 3000) */
+  broadcast: number;
+  /** 5-1 조합 연출 진행 */
+  ritualT: number;
+  ritualStep: number;
+  /** 화면 진동 */
+  shake: number;
+  /** 흰 섬광 */
+  flash: number;
+  /** 화면에 뜨는 무전 한 줄 */
+  radio: string | null;
+  radioT: number;
+  /** 구역 이름 카드 */
+  card: string | null;
+  cardT: number;
+  /** 상호작용 대상 */
+  target: InteractTarget | null;
+  /** 상호작용 버튼을 누르고 있는가 */
+  held: boolean;
+  /** 이번 프레임에 새로 눌렀는가 */
+  pressed: boolean;
+  /** 조작 입력 (-1~1) */
+  inx: number;
+  iny: number;
+  /** 마우스가 가리키는 방향 (라디안). null이면 이동 방향을 본다 */
+  aim: number | null;
+  /** 처음 손전등을 켰을 때 안내를 한 번만 */
+  toldTorch: boolean;
+  score_: StageScore | null;
+  /** 연습 모드 좀비 수 (null이면 정상) */
+  practiceZombies: number | null;
+  /** 지도 전체 보기 */
+  mapOpen: boolean;
+  /** 이번 판에서 깨운 친구 수 */
+  rescued: number;
+  /** 오디오 하품 스로틀 */
+  yawnBudget: number;
+  time: number;
+  /** 대사에 들어갈 이름 */
+  playerName: string;
+  /** 이미 보여 준 메커닉 안내 */
+  hints: string[];
+  /** 재료를 주운 순간의 짧은 정지 */
+  hitstop: number;
+  /** 잠그는 중인 문 (없으면 -1) */
+  castDoor: number;
+  castT: number;
+  /** 이번 판에 쌓인 「아슬아슬」 점수 */
+  nearMissScore: number;
+  /** 발소리 간격 */
+  stepT: number;
+  bossIntroDone: boolean;
+  /** 이번 판에 주운 급식표 */
+  menusThisRun: number[];
+  /** 친구가 따라붙은 순서 */
+  friendSeq: number;
+  /** 가상 조이스틱을 잡고 있는가 (키보드 입력과 안 싸우게) */
+  padActive: boolean;
+}
+
+export interface InteractTarget {
+  kind: "friend" | "item" | "door" | "locker" | "beaker" | "broadcast" | "exit";
+  x: number;
+  y: number;
+  index: number;
+}
+
+export interface HudState {
+  phase: Phase;
+  section: string;
+  score: number;
+  menus: number;
+  ingredients: boolean[];
+  alarms: number;
+  torch: boolean;
+  canTorch: boolean;
+  canChalk: boolean;
+  canAlarm: boolean;
+  sleepLine: string;
+  canSkip: boolean;
+  showRestart: boolean;
+  broadcast: number;
+  showBroadcast: boolean;
+  stars: number;
+  scoreBoard: StageScore | null;
+  sleeps: number;
+  stageId: number;
+  hasIngredientA: boolean;
+  hasIngredientB: boolean;
+  /** 지금 어두운 방에 있는가 (손전등 버튼은 여기서만 나온다) */
+  inDark: boolean;
+}

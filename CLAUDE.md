@@ -10,6 +10,8 @@ Web games built for two 10-year-old girls. One directory per game, one git repo 
 | `02.princess-shooters` | live; Next.js 16; princesses riding fairytale mounts, wave shooter with 3-stage boss |
 | `_03.flash_maze` | live; Next.js 16; memorize a maze in 5 seconds, then escape in the dark |
 | `04.escape_room` | live; Next.js 16; top-down escape room, 5 puzzle rooms per stage (stage 1 「달빛 성」 done) |
+| `05.Karaoke` | built, not yet deployed; Next.js 16; home karaoke — text notation (도레미) → synth melody + auto accompaniment, syllable-fill lyrics, mic pitch scoring. Ships with zero copyrighted content: songs are typed in by the kids and live in localStorage only |
+| `06.school_zombie_lets_survive` | built, not yet deployed; Next.js 16; Among Us 느낌 탑다운, 초등학교 배경 「졸음 좀비」 회피, 5스테이지 15구역, 자유 8방향 이동. 스펙·리뷰는 `docs/` (DESIGN.md v0.4, BUILD_NOTES.md) |
 
 Git: repo root is `~/Projects/03.games`, remote `origin`, branch `main`. Each game deploys separately to Vercel from its own directory.
 
