@@ -36,6 +36,9 @@ export type SFX =
   | "stageStart"
   | "alarmSet"
   | "exitOpen"
+  | "ventOpen"
+  | "ventCrawl"
+  | "ventFound"
   | "sleep";
 
 interface WindowWithWebkitAudio extends Window {
@@ -348,6 +351,17 @@ export function playYawn(dx: number, dist: number, blocked: boolean): void {
   });
 }
 
+/**
+ * 아직 못 구한 친구가 부르는 소리 (2.5초마다 반복되는 **위치 비컨**).
+ * `friendWake`(구출 성공)보다 짧고 높고 절반 크기다 — 알림이 아니라 배경에 깔리는 신호다.
+ */
+export function playFriendCall(dx: number, dist: number): void {
+  const pan = Math.max(-1, Math.min(1, dx / 240));
+  const g = Math.max(0, 1 - dist / 260) * 0.075;
+  if (g < 0.004) return;
+  tone({ freq: 660, to: 880, dur: 0.18, type: "sine", gain: g, pan });
+}
+
 /** 급식 아주머니 국자 — 화면 밖에서 오는 걸 미리 알려 준다 */
 export function playClank(dx: number, dist: number): void {
   const pan = Math.max(-1, Math.min(1, dx / 240));
@@ -509,6 +523,24 @@ export function playSfx(name: SFX): void {
     case "exitOpen":
       tone({ freq: 392, to: 784, dur: 0.4, type: "triangle", gain: 0.16 });
       tone({ freq: 1046.5, dur: 0.3, type: "sine", gain: 0.1, delay: 0.3 });
+      break;
+    case "ventOpen":
+      // 금속 그릴이 삐걱 열린다
+      tone({ freq: 320, to: 180, dur: 0.4, type: "sawtooth", gain: 0.08, cutoff: 1400 });
+      noise({ dur: 0.22, gain: 0.06, cutoff: 2400, highpass: true });
+      break;
+    case "ventCrawl":
+      // 관 속에서 울리는 기어가는 소리 + 먼지 (1.2초)
+      for (let i = 0; i < 6; i++) {
+        noise({ dur: 0.16, gain: 0.045, cutoff: 700, delay: i * 0.2 });
+      }
+      tone({ freq: 90, to: 70, dur: 1.2, type: "sine", gain: 0.05 });
+      break;
+    case "ventFound":
+      // 급식표보다 낮고 뿌듯한 3음 상승
+      [392, 493.88, 587.33].forEach((f, i) =>
+        tone({ freq: f, dur: 0.22, type: "triangle", gain: 0.18, delay: i * 0.12 }),
+      );
       break;
     case "sleep":
       // 하품 → 베개 툭 → 코골이 (§6 연출과 1:1). 마지막 음(A3)에서 진짜 잠들듯 페이드.

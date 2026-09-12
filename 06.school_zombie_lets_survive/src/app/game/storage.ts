@@ -7,6 +7,12 @@ import type { Look } from "./types";
 
 const KEY = "zombie-school:v1";
 
+/** 이름별 기록. 진행도(해금·별·급식표·환풍구)는 그대로 하나를 공유한다 — 프로필 시스템이 아니다. */
+export interface NameRecord {
+  best: number[];
+  bestTimeMs: number[];
+}
+
 export interface SaveData {
   name: string;
   look: Look;
@@ -17,6 +23,12 @@ export interface SaveData {
   friendsMet: boolean[];
   sleepCount: number;
   unlockedHats: string[];
+  /** 찾은 환풍구 8칸 (한 번 찾으면 영원히) */
+  vents: boolean[];
+  /** 이름별 최고 점수·최단 시간 */
+  records: Record<string, NameRecord>;
+  /** 기록판에 보여 줄 최근 이름 (최신 순) */
+  recentNames: string[];
   bgmOn: boolean;
   sfxOn: boolean;
   /** 엔딩을 본 적이 있는가 (연습 모드 해금) */
@@ -34,6 +46,9 @@ export function emptySave(): SaveData {
     friendsMet: [false, false, false, false],
     sleepCount: 0,
     unlockedHats: [],
+    vents: new Array(8).fill(false),
+    records: {},
+    recentNames: [],
     bgmOn: true,
     sfxOn: true,
     ending: false,
@@ -55,6 +70,11 @@ export function load(): SaveData {
       best: fixArray(parsed.best, 5, 0),
       menuPieces: fixArray(parsed.menuPieces, 10, false),
       friendsMet: fixArray(parsed.friendsMet, 4, false),
+      vents: fixArray(parsed.vents, 8, false),
+      records: normalizeRecords(parsed.records),
+      recentNames: Array.isArray(parsed.recentNames)
+        ? parsed.recentNames.filter((n): n is string => typeof n === "string")
+        : [],
       unlockedHats: Array.isArray(parsed.unlockedHats) ? parsed.unlockedHats : [],
     };
   } catch {
@@ -81,6 +101,24 @@ function fixArray<T>(value: unknown, len: number, fallback: T): T[] {
   return out;
 }
 
+function normalizeRecords(value: unknown): Record<string, NameRecord> {
+  const out: Record<string, NameRecord> = {};
+  if (!value || typeof value !== "object") return out;
+  for (const [name, rec] of Object.entries(value as Record<string, unknown>)) {
+    const r = rec as Partial<NameRecord>;
+    out[name] = {
+      best: fixArray(r?.best, 5, 0),
+      bestTimeMs: fixArray(r?.bestTimeMs, 5, 0),
+    };
+  }
+  return out;
+}
+
+/** 이름 하나의 기록 칸을 꺼내 온다 (없으면 빈 칸) */
+export function recordFor(data: SaveData, name: string): NameRecord {
+  return data.records[name] ?? { best: [0, 0, 0, 0, 0], bestTimeMs: [0, 0, 0, 0, 0] };
+}
+
 export function save(data: SaveData): void {
   if (typeof window === "undefined") return;
   try {
@@ -98,6 +136,7 @@ export function refreshHats(data: SaveData): SaveData {
   if (total >= 10) hats.add("crown");
   if (total >= 15) hats.add("lunch");
   if (data.menuPieces.every(Boolean)) hats.add("pudding");
+  if (data.vents.every(Boolean)) hats.add("janitor");
   data.unlockedHats = [...hats];
   return data;
 }

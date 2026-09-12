@@ -6,6 +6,7 @@ import { STAGES } from "./maps";
 import { drawMenuPiece, drawStar } from "./sprites";
 import SpriteCanvas from "./SpriteCanvas";
 import { MENU_ITEMS, MENU_MATRON, MENU_SCREEN_TITLE, fill } from "./text";
+import { recordFor } from "./storage";
 import type { SaveData } from "./storage";
 
 interface Props {
@@ -14,6 +15,31 @@ interface Props {
   onPick: (stageId: number, practice: number | null) => void;
   onBack: () => void;
   onEnding: () => void;
+}
+
+interface BoardRow {
+  name: string;
+  score: string;
+  time: string;
+  leader: boolean;
+}
+
+/** 최근 이름 두 개의 기록. 이름이 하나뿐이면 한 줄만 나온다 (빈 칸을 보여주지 않는다). */
+function boardFor(save: SaveData, stageId: number): BoardRow[] {
+  const i = stageId - 1;
+  const names = save.recentNames.filter((n) => recordFor(save, n).best[i] > 0).slice(0, 2);
+  if (!names.length) return [];
+  const top = Math.max(...names.map((n) => recordFor(save, n).best[i]));
+  return names.map((n) => {
+    const rec = recordFor(save, n);
+    const sec = rec.bestTimeMs[i] > 0 ? Math.round(rec.bestTimeMs[i] / 1000) : 0;
+    return {
+      name: n,
+      score: `${rec.best[i]}점`,
+      time: sec > 0 ? `${sec}초` : "-",
+      leader: rec.best[i] === top && names.length > 1,
+    };
+  });
 }
 
 export default function StageSelect({ save, playerName, onPick, onBack, onEnding }: Props) {
@@ -83,11 +109,26 @@ export default function StageSelect({ save, playerName, onPick, onBack, onEnding
                   <p className="truncate text-xs text-violet-200/75">
                     {locked ? "앞 스테이지를 깨면 열려!" : st.subtitle}
                   </p>
-                  {!locked && save.best[st.id - 1] > 0 && (
-                    <p className="text-[11px] text-violet-300/70">
-                      최고 점수 {save.best[st.id - 1]}
+                  {!locked && (
+                    <p className="text-[11px] text-teal-200/80">
+                      ◆ 환풍구 {st.vents.filter((v) => save.vents[v.id]).length}/
+                      {st.vents.length}
                     </p>
                   )}
+                  {/* 이름별 기록 — 자매가 번갈아 하는 게 이 게임의 실제 사용 환경이다 */}
+                  {!locked &&
+                    boardFor(save, st.id).map((row) => (
+                      <p
+                        key={row.name}
+                        // 왕관(1등)과 "나"는 다른 축이다 — 내 줄은 배경 칩으로 찾는다
+                        className={`inline-block rounded-md text-[11px] ${
+                          row.name === playerName ? "bg-white/15 px-1.5" : ""
+                        } ${row.leader ? "text-amber-200" : "text-violet-200/80"}`}
+                      >
+                        {row.leader ? "♔ " : ""}
+                        {row.name} · {row.score} · {row.time}
+                      </p>
+                    ))}
                 </div>
                 <SpriteCanvas
                   width={74}

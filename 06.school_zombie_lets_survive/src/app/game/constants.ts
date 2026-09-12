@@ -99,6 +99,43 @@ export const BOSS = {
 
 export const BROADCAST_HOLD_MS = 3000;
 
+/**
+ * 환풍구 (DESIGN §13-1).
+ * **쫓기는 중에는 절대 못 쓴다** — 그래야 사물함(쫓길 때 살아남는 곳)의 자리가 안 겹친다.
+ */
+export const VENT = {
+  /** 진입 상호작용. 사물함(0.25초)보다 훨씬 느리다 */
+  enterMs: 800,
+  /** 관 속 크롤 (조작 불가) */
+  crawlMs: 1200,
+  /** 출구 등장 */
+  exitMs: 300,
+  /** 재진입 쿨다운 */
+  cdMs: 2000,
+  /** 나온 직후 잡히지 않는 시간 — 크롤 중 좀비가 출구에 와 있어도 `?`부터 시작한다 */
+  graceMs: 600,
+  /** 이 거리 안에 추격 중인 좀비가 있으면 못 들어간다 */
+  blockR: 200,
+  /** 전체 개수 (스테이지 1/2/2/2/1) */
+  total: 8,
+  score: 200,
+};
+
+/** 친구 특기 (DESIGN §13-2) — 전부 누적된다 */
+export const FRIEND_POWER = {
+  /** 다온 — 분필 쿨다운 */
+  chalkCd: 700,
+  /** 세은 — 방송 게이지 배속 */
+  broadcastMult: 1.5,
+  /** 하늘 — `?` 유예 추가 (스테이지 4·5) */
+  noticeBonus: 0.2,
+  /** 아직 못 구한 친구가 "여기야!"를 외치는 거리 */
+  callR: 260,
+  callMs: 2500,
+  /** 미니맵에 하늘색 점으로 보이는 거리 */
+  minimapR: 300,
+};
+
 export const MINIMAP_W = 132;
 export const MINIMAP_H = 88;
 export const MINIMAP_ZOMBIE_R = 250;
@@ -160,6 +197,7 @@ export const HATS = [
   { id: "crown", name: "왕관", need: "별 10개" },
   { id: "lunch", name: "급식 모자", need: "별 15개" },
   { id: "pudding", name: "딸기 푸딩 모자", need: "급식표 10개" },
+  { id: "janitor", name: "청소부 모자", need: "환풍구 8개" },
 ];
 
 export const SUGGESTED_NAMES = ["하린", "서아", "유나", "지우"];

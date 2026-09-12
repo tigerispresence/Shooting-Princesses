@@ -1,6 +1,7 @@
 import {
   ALARM,
   BOSS,
+  COLORS,
   BROADCAST_HOLD_MS,
   BOSS_CATCH_DIST,
   BOSS_R,
@@ -26,7 +27,9 @@ import {
   SCORE,
   SKIP_AFTER_MS,
   TILE,
+  FRIEND_POWER,
   TORCH_NOTICE_MULT,
+  VENT,
   VIEW_H,
   VIEW_W,
   YAWN_HEAR_R,
@@ -38,6 +41,7 @@ import {
   playAlarmRing,
   playBroadcastTick,
   playClank,
+  playFriendCall,
   playSfx,
   playSpeechSyllable,
   playStep,
@@ -56,6 +60,7 @@ import type {
   Player,
   StageScore,
   Vec,
+  VentEnt,
   Zombie,
 } from "./types";
 
@@ -362,6 +367,10 @@ export interface CreateOpts {
   stageId: number;
   playerName: string;
   menuPieces: boolean[];
+  /** 이미 찾아 둔 환풍구 (전역 8칸) — 한 번 찾으면 영원히 내 것이다 */
+  foundVents: boolean[];
+  /** 구출해 둔 친구 — 스테이지 5에는 이 친구들이 따라 들어온다 */
+  friendsMet: boolean[];
   practiceZombies?: number | null;
 }
 
@@ -426,6 +435,17 @@ export function createGame(opts: CreateOpts): GameState {
     card: null,
     cardT: 0,
     target: null,
+    vents: [],
+    ventT: 0,
+    ventFrom: -1,
+    ventCd: 0,
+    ventDenyT: 0,
+    ventGrace: 0,
+    foundVents: [...opts.foundVents],
+    friendPower: [false, false, false, false],
+    powerPop: [0, 0, 0, 0],
+    broadcastFilling: 0,
+    callT: 0,
     held: false,
     pressed: false,
     inx: 0,
@@ -449,7 +469,33 @@ export function createGame(opts: CreateOpts): GameState {
     menusThisRun: [],
     friendSeq: 0,
     padActive: false,
+    friendScore: 0,
   };
+
+  // 환풍구 — 쌍마다 양쪽 끝을 하나씩 만든다
+  for (const pair of stage.vents) {
+    const ai = s.vents.length;
+    const bi = ai + 1;
+    const found = !!s.foundVents[pair.id];
+    s.vents.push({
+      id: pair.id,
+      other: bi,
+      x: pair.a.x * TILE + TILE / 2,
+      y: pair.a.y * TILE + TILE / 2,
+      prop: pair.a.prop,
+      found,
+      charge: 0,
+    });
+    s.vents.push({
+      id: pair.id,
+      other: ai,
+      x: pair.b.x * TILE + TILE / 2,
+      y: pair.b.y * TILE + TILE / 2,
+      prop: pair.b.prop,
+      found,
+      charge: 0,
+    });
+  }
 
   // 맵을 훑어서 등장인물과 물건을 뽑아낸다
   let zSeed = stage.id * 977;
@@ -555,6 +601,31 @@ export function createGame(opts: CreateOpts): GameState {
   // 연습 모드 — 좀비 수를 직접 줄여서 마음껏 돌아다닌다
   if (s.practiceZombies !== null) {
     s.zombies = s.zombies.slice(0, Math.max(0, s.practiceZombies));
+  }
+
+  // 구출한 친구는 스테이지 5까지 따라온다 (DESIGN §13-2).
+  // 세은의 "나도 방송실 가는 거 도와줄게!"가 그제서야 말이 된다.
+  if (stage.id === 5) {
+    opts.friendsMet.forEach((met, who) => {
+      if (!met) return;
+      // 처음부터 뱀처럼 늘어선 채로 등장한다 (32 / 46 / 60 / 74 누적)
+      const back = s.friends.reduce((sum, _, i) => sum + FRIEND_FOLLOW_DIST + 14 * i, 0)
+        + FRIEND_FOLLOW_DIST + 14 * s.friends.length;
+      s.friends.push({
+        id: s.friends.length,
+        who,
+        x: player.x - back,
+        y: player.y + 14,
+        home: { x: player.x, y: player.y },
+        state: "follow",
+        wakeT: 0,
+        order: s.friendSeq++,
+        trail: [],
+        bob: 0,
+        // 스테이지 4에서 이미 점수를 받았다 — 여기서 또 주지 않는다
+        scored: true,
+      });
+    });
   }
 
   for (const z of s.zombies) resetZombie(s, z);
@@ -728,7 +799,10 @@ export function throwChalk(s: GameState): void {
   if (s.stageId < 2) return;
   if (s.player.hiding >= 0) return;
   if (s.player.chalkCd > 0) return;
-  s.player.chalkCd = CHALK.cd;
+  // 다온(미술부)이 따라오면 분필을 더 자주 던질 수 있다 — 분필을 죽이는 게 아니라 더 쓰게 만든다
+  const fast = s.friendPower[1];
+  s.player.chalkCd = fast ? FRIEND_POWER.chalkCd : CHALK.cd;
+  if (fast) s.powerPop[1] = 600;
   const a = s.aim ?? s.player.face;
   s.chalks.push({
     x: s.player.x,
@@ -817,6 +891,37 @@ export function update(s: GameState, dtMs: number): void {
     s.pressed = false;
     return;
   }
+  if (s.phase === "venting") {
+    // 관 속을 기어가는 동안에도 바깥 세상은 계속 돈다 — 시간이 멈추면 환풍구가 너무 세진다.
+    // 다만 플레이어는 보이지 않고 잡히지도 않는다.
+    s.ventT += dtMs;
+    s.elapsed += dtMs;
+    updateDoors(s, dtMs);
+    updateChalks(s, dt, dtMs);
+    updateAlarms(s, dtMs);
+    updateZombies(s, dt, dtMs);
+    updateFriends(s, dt, dtMs);
+    updateBoss(s, dt, dtMs);
+    updateCamera(s, dt);
+    if (s.ventT >= VENT.crawlMs + VENT.exitMs) {
+      s.phase = "playing";
+      s.ventT = 0;
+      s.ventFrom = -1;
+      s.ventCd = VENT.cdMs;
+      // 기어오는 1.2초 사이에 좀비가 출구 앞에 와 있을 수 있다.
+      // `?` 없이 0px에서 잡히면 아이는 "내가 뭘 잘못했는지" 알 수 없다 — §M1 공정성 계약 위반.
+      // 그래서 **등장 유예 0.6초** + 근처 좀비는 반드시 `?`부터 다시 시작한다. 시간 정지가 아니다.
+      s.ventGrace = VENT.graceMs;
+      for (const z of s.zombies) {
+        if (dist(z.x, z.y, s.player.x, s.player.y) > 200) continue;
+        if (z.state !== "chase" && z.state !== "notice") continue;
+        z.state = "notice";
+        z.t = noticeDelayMs(s, z);
+      }
+    }
+    s.pressed = false;
+    return;
+  }
 
   if (s.hitstop > 0) {
     s.hitstop -= dtMs;
@@ -825,6 +930,14 @@ export function update(s: GameState, dtMs: number): void {
   }
 
   s.elapsed += dtMs;
+  if (s.ventCd > 0) s.ventCd -= dtMs;
+  if (s.ventGrace > 0) s.ventGrace -= dtMs;
+  if (s.ventDenyT > 0) s.ventDenyT -= dtMs;
+  if (s.broadcastFilling > 0) s.broadcastFilling -= dtMs;
+  for (let i = 0; i < s.powerPop.length; i++) {
+    if (s.powerPop[i] > 0) s.powerPop[i] -= dtMs;
+  }
+  updateFriendPowers(s, dtMs);
 
   // 전체 지도를 아이가 스스로 못 찾을 수 있어서 1-1에서 한 번 알려 준다
   if (s.stageId === 1 && s.elapsed > 9000) hint(s, "map");
@@ -931,6 +1044,37 @@ function updatePlayer(s: GameState, dt: number, dtMs: number): void {
   if (tile?.exit && s.exitOpen) finishStage(s);
 }
 
+/**
+ * 따라오는 친구의 특기를 매 프레임 다시 센다 (DESIGN §13-2). 전부 누적된다.
+ * 어느 것도 좀비를 직접 무력화하지 않는다 — 전부 "조금 편해진다"의 범주다.
+ */
+function updateFriendPowers(s: GameState, dtMs: number): void {
+  for (let i = 0; i < 4; i++) s.friendPower[i] = false;
+  for (const f of s.friends) if (f.state === "follow") s.friendPower[f.who] = true;
+
+  // 아직 못 구한 친구는 가까이 가면 "여기야!" 하고 부른다.
+  // 넓은 스테이지 4에서 친구를 못 찾는 문제만 정확히 해결한다 — 버튼은 안 만든다.
+  s.callT -= dtMs;
+  if (s.callT <= 0) {
+    s.callT = FRIEND_POWER.callMs;
+    for (const f of s.friends) {
+      if (f.state !== "asleep") continue;
+      if (dist(f.x, f.y, s.player.x, s.player.y) > FRIEND_POWER.callR) continue;
+      s.floaters.push({
+        x: f.x,
+        y: f.y - 30,
+        text: "여기야!",
+        color: "#7FD4FF",
+        life: 1600,
+      });
+      // 2.5초마다 반복되는 **위치 비컨**이다. 구출 순간(friendWake)과 같은 소리를 쓰면
+      // 정작 진짜 구출한 순간이 안 특별해진다.
+      playFriendCall(f.x - s.player.x, dist(f.x, f.y, s.player.x, s.player.y));
+      break;
+    }
+  }
+}
+
 function updateSection(s: GameState): void {
   const tx = s.player.x / TILE;
   const ty = s.player.y / TILE;
@@ -982,6 +1126,23 @@ function updateInteraction(s: GameState, dtMs: number): void {
       }
       return;
     }
+    if (t.kind === "vent" && s.vents[t.index].found) {
+      // 이미 찾은 환풍구 — 꾹 눌러 들어간다.
+      // **아직 못 찾았으면 여기서 return하지 않는다.** 그러면 아래 `pressed` 발견 분기에
+      // 영원히 도달하지 못한다 (`pressed`는 프레임마다 리셋되므로 사람 손으로는 못 누른다).
+      const v = s.vents[t.index];
+      if (ventBlocked(s)) {
+        s.ventDenyT = 1000;
+        v.charge = 0;
+      } else if (Math.abs(s.inx) + Math.abs(s.iny) > 0.1) {
+        // 도중에 움직이면 취소 — 0.8초 동안 무방비라는 게 이 메커닉의 값이다
+        v.charge = 0;
+      } else {
+        v.charge += dtMs / VENT.enterMs;
+        if (v.charge >= 1) enterVent(s, t.index);
+      }
+      return;
+    }
     if (t.kind === "broadcast") {
       if (!s.exitOpen) {
         // 해독제를 안 만들고 오면 방송을 켤 수 없다
@@ -989,7 +1150,11 @@ function updateInteraction(s: GameState, dtMs: number): void {
         return;
       }
       const before = s.broadcast;
-      s.broadcast = Math.min(BROADCAST_HOLD_MS, s.broadcast + dtMs);
+      // 세은(방송부)이 있으면 게이지가 1.5배 빨리 찬다. 보스 사이클 자체는 안 건드린다.
+      const mult = s.friendPower[3] ? FRIEND_POWER.broadcastMult : 1;
+      if (mult > 1) s.powerPop[3] = 400;
+      s.broadcastFilling = 250;
+      s.broadcast = Math.min(BROADCAST_HOLD_MS, s.broadcast + dtMs * mult);
       if (Math.floor(before / 250) !== Math.floor(s.broadcast / 250)) {
         playBroadcastTick(s.broadcast / BROADCAST_HOLD_MS);
       }
@@ -999,6 +1164,7 @@ function updateInteraction(s: GameState, dtMs: number): void {
   }
   if (!s.held) {
     for (const f of s.friends) if (f.state === "asleep") f.wakeT = 0;
+    for (const v of s.vents) v.charge = 0;
   }
 
   if (!s.pressed || !t) return;
@@ -1037,6 +1203,12 @@ function updateInteraction(s: GameState, dtMs: number): void {
       }
       break;
     }
+    case "vent": {
+      const v = s.vents[t.index];
+      // 걸어 들어가서가 아니라 **눌러서** 찾는다 — 그래야 "내가 찾았다"가 된다
+      if (!v.found) findVent(s, v);
+      break;
+    }
     case "beaker": {
       if (s.phase === "playing") startRitual(s);
       break;
@@ -1044,6 +1216,72 @@ function updateInteraction(s: GameState, dtMs: number): void {
     default:
       break;
   }
+}
+
+/** 어두운 방의 그릴은 손전등 없이는 벽과 구분되지 않는다 */
+function ventHidden(s: GameState, v: VentEnt): boolean {
+  const t = tileAt(s.map, tileOf(v.x), tileOf(v.y));
+  if (!t || t.room < 0) return false;
+  if (!s.map.rooms[t.room].dark) return false;
+  return !s.player.torchOn;
+}
+
+/** 지금 이 환풍구에 들어갈 수 있는가. 못 들어가면 왜 못 들어가는지도 같이 돌려준다. */
+function ventBlocked(s: GameState): boolean {
+  if (s.ventCd > 0) return true;
+  // 방송 게이지를 채우는 중에는 못 들어간다 (§13-1 보스 층 규칙)
+  if (s.stageId === 5 && s.broadcastFilling > 0) return true;
+  // **추격 중인 좀비가 200px 안에 있으면 절대 못 들어간다.**
+  // 이 한 줄이 사물함("쫓길 때 살아남는 곳")의 자리를 지켜 준다.
+  for (const z of s.zombies) {
+    if (z.state !== "chase") continue;
+    if (dist(z.x, z.y, s.player.x, s.player.y) <= VENT.blockR) return true;
+  }
+  return false;
+}
+
+function enterVent(s: GameState, index: number): void {
+  const from = s.vents[index];
+  const to = s.vents[from.other];
+  if (!to) return;
+  s.phase = "venting";
+  s.ventT = 0;
+  s.ventFrom = index;
+  from.charge = 0;
+  // 목격한 좀비는 환풍구 앞에서 하품하다 순찰로 돌아간다 (사물함과 같은 규칙)
+  for (const z of s.zombies) {
+    if (z.state === "chase" || z.state === "notice") {
+      z.state = "investigate";
+      z.goal = { x: from.x, y: from.y };
+      z.t = ZOMBIE_WAIT_MS;
+      z.route = [];
+    }
+  }
+  // 크롤 연출이 화면을 덮는 동안 반대쪽으로 옮겨 둔다
+  s.player.x = to.x;
+  s.player.y = to.y;
+  s.player.hiding = -1;
+  unstick(s, s.player, PLAYER_R, false);
+  playSfx("ventOpen");
+  playSfx("ventCrawl");
+}
+
+function findVent(s: GameState, v: VentEnt): void {
+  for (const other of s.vents) {
+    if (other.id === v.id) other.found = true;
+  }
+  s.foundVents[v.id] = true;
+  s.score += VENT.score;
+  s.floaters.push({
+    x: v.x,
+    y: v.y - 22,
+    text: `비밀 통로! +${VENT.score}`,
+    color: COLORS.lockerTrim,
+    life: 1500,
+  });
+  spawnSparks(s, v.x, v.y, COLORS.lockerTrim, 14);
+  playSfx("ventFound");
+  hint(s, "vent");
 }
 
 function findTarget(s: GameState): InteractTarget | null {
@@ -1075,8 +1313,13 @@ function findTarget(s: GameState): InteractTarget | null {
   s.items.forEach((it, i) => {
     if (!it.taken) consider("item", it.x, it.y, i, 1);
   });
+  // 환풍구 — 어두운 방에서는 손전등을 켜야만 그릴이 보인다 (호기심에 값을 매긴다)
+  s.vents.forEach((v, i) => {
+    if (ventHidden(s, v)) return;
+    consider("vent", v.x, v.y, i, 2);
+  });
   s.doors.forEach((d, i) => {
-    if (d.uses > 0 && d.lockT <= 0) consider("door", d.x, d.y, i, 2);
+    if (d.uses > 0 && d.lockT <= 0) consider("door", d.x, d.y, i, 3);
   });
 
   // 사물함 / 비커 / 방송실 문 — 타일을 직접 본다
@@ -1088,7 +1331,7 @@ function findTarget(s: GameState): InteractTarget | null {
       if (!t) continue;
       const c = center(x, y);
       const idx = y * s.map.w + x;
-      if (t.locker && !s.player.lockerCd.has(idx)) consider("locker", c.x, c.y, idx, 3);
+      if (t.locker && !s.player.lockerCd.has(idx)) consider("locker", c.x, c.y, idx, 4);
       if (t.beaker) consider("beaker", c.x, c.y, idx, 1);
       if (t.broadcast) consider("broadcast", c.x, c.y, idx, 0);
     }
@@ -1272,8 +1515,9 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
       case "patrol":
         if (sees) {
           z.state = "notice";
-          z.t = z.noticeDelay * 1000;
+          z.t = noticeDelayMs(s, z);
           playSfx("notice");
+          if (s.friendPower[0] && s.stageId >= 4) s.powerPop[0] = 700;
         } else {
           patrolStep(s, z, dt, dtMs);
         }
@@ -1317,7 +1561,7 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
         }
         if (sees) {
           z.state = "notice";
-          z.t = z.noticeDelay * 1000;
+          z.t = noticeDelayMs(s, z);
           playSfx("notice");
           break;
         }
@@ -1360,8 +1604,8 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
       }
     }
 
-    // 잡힘
-    if (!hidden && s.phase === "playing" && dp < CATCH_DIST) {
+    // 잡힘 (환풍구에서 막 나온 0.6초 동안은 잡히지 않는다)
+    if (!hidden && s.phase === "playing" && s.ventGrace <= 0 && dp < CATCH_DIST) {
       caught(s, z.kind === "matron" ? "matron" : hasFollower(s) ? "buddy" : "pillow");
     }
   }
@@ -1387,6 +1631,12 @@ function knockOnLockedDoor(s: GameState, z: Zombie, dtMs: number): void {
     playSfx("knock");
     return;
   }
+}
+
+/** 하늘(축구부)이 따라오면 스테이지 4·5에서 `?` 유예가 0.2초 늘어난다 */
+function noticeDelayMs(s: GameState, z: Zombie): number {
+  const bonus = s.friendPower[0] && s.stageId >= 4 ? FRIEND_POWER.noticeBonus : 0;
+  return (z.noticeDelay + bonus) * 1000;
 }
 
 function hasFollower(s: GameState): boolean {
@@ -1520,6 +1770,7 @@ function wakeFriend(s: GameState, f: Friend): void {
   setRadio(s, FRIENDS[f.who].line);
   if (!f.scored) {
     f.scored = true;
+    s.friendScore += SCORE.friend;
     s.score += SCORE.friend;
     s.floaters.push({
       x: f.x,
@@ -1539,13 +1790,15 @@ function updateFriends(s: GameState, dt: number, dtMs: number): void {
 
   let leadX = s.player.x;
   let leadY = s.player.y;
-  for (const f of followers) {
+  followers.forEach((f, n) => {
     f.bob += dt * 6;
+    // 뒤로 갈수록 간격을 벌린다 (32 / 46 / 60 / 74) — 넷이 한 덩어리로 뭉치지 않게
+    const gap = FRIEND_FOLLOW_DIST + 14 * n;
     const d = dist(f.x, f.y, leadX, leadY);
-    if (d > FRIEND_FOLLOW_DIST) {
+    if (d > gap) {
       const k = Math.min(1, (dt * 240) / Math.max(d, 1));
-      const tx = leadX + ((f.x - leadX) / d) * FRIEND_FOLLOW_DIST;
-      const ty = leadY + ((f.y - leadY) / d) * FRIEND_FOLLOW_DIST;
+      const tx = leadX + ((f.x - leadX) / d) * gap;
+      const ty = leadY + ((f.y - leadY) / d) * gap;
       moveCircle(s, f, PLAYER_R - 2, (tx - f.x) * k * 3, (ty - f.y) * k * 3, false);
     }
     leadX = f.x;
@@ -1565,7 +1818,7 @@ function updateFriends(s: GameState, dt: number, dtMs: number): void {
         break;
       }
     }
-  }
+  });
   // 다시 잠든 친구는 그 자리에서 깨우면 된다
   for (const f of s.friends) {
     if (f.state === "down") {
@@ -1597,7 +1850,7 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
   switch (b.phase) {
     case "walk":
       if (p.hiding < 0) moveToward2(s, b, p.x, p.y, BOSS.walkSpeed, dt);
-      if (dp < BOSS_CATCH_DIST && p.hiding < 0) caught(s, "boss");
+      if (dp < BOSS_CATCH_DIST && p.hiding < 0 && s.ventGrace <= 0) caught(s, "boss");
       if (b.t >= BOSS.walkMs) {
         b.phase = "windup";
         b.t = 0;
@@ -1605,7 +1858,7 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
       }
       break;
     case "windup":
-      if (dp < BOSS_CATCH_DIST && p.hiding < 0) caught(s, "boss");
+      if (dp < BOSS_CATCH_DIST && p.hiding < 0 && s.ventGrace <= 0) caught(s, "boss");
       if (b.t >= BOSS.windupMs) {
         b.phase = "speech";
         b.t = 0;
@@ -1622,6 +1875,7 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
       // 눈을 감고 있어 몸통 충돌은 꺼진다. 벽·기둥에 막히면 안전하다.
       if (
         p.hiding < 0 &&
+        s.ventGrace <= 0 &&
         dp < b.radius &&
         hasLineOfSight(s.map, b.x, b.y, p.x, p.y)
       ) {
@@ -1713,6 +1967,12 @@ export function restartFromCheckpoint(s: GameState): void {
   s.player.alarms = Math.max(s.player.alarms, s.stage.startAlarms);
   s.chalks.length = 0;
   s.alarms.length = 0;
+  s.ventT = 0;
+  s.ventFrom = -1;
+  s.ventCd = 0;
+  s.ventDenyT = 0;
+  s.ventGrace = 0;
+  for (const v of s.vents) v.charge = 0;
   s.castDoor = -1;
   s.castT = 0;
   s.particles.length = 0;
@@ -1763,7 +2023,8 @@ function finishStage(s: GameState): void {
     [a, b].filter((i) => s.gotIngredients[i]).length * SCORE.ingredient;
   const stealth = s.neverSpotted && allIngredients ? SCORE.stealth : 0;
   const fresh = s.sleeps === 0 ? SCORE.fresh : 0;
-  const friendScore = awake * SCORE.friend;
+  // 스테이지 5에 따라 들어온 친구에게는 점수를 다시 주지 않는다
+  const friendScore = s.friendScore;
 
   let stars = 1;
   if (allIngredients && allMenus) stars = 2;
@@ -1888,6 +2149,9 @@ export function toHud(s: GameState): HudState {
     hasIngredientA: s.gotIngredients[stageIngredients[0]],
     hasIngredientB: s.gotIngredients[stageIngredients[1]],
     inDark,
+    vents: s.foundVents.filter(Boolean).length,
+    companions: s.friends.filter((f) => f.state === "follow").map((f) => f.who),
+    timeMs: Math.round(s.elapsed / 1000) * 1000,
   };
 }
 

@@ -175,12 +175,9 @@ export default function TouchControls({
   );
 
   return (
-    // 조작 영역은 아래 재료 줄 위까지 덮는다 — 그래야 버튼이 엄지 반경(화면 아래에서 20~200px) 안에 들어온다.
+    // 재료 줄이 캔버스 바로 아래로 올라갔으므로, 조작 영역은 화면 아래 끝까지 그대로 쓴다.
     // 판 자체는 이벤트를 안 먹고, 조이스틱 판과 버튼만 먹는다.
-    <div
-      className="pointer-events-none absolute left-0 right-0 top-0 select-none"
-      style={{ bottom: -40 }}
-    >
+    <div className="pointer-events-none absolute inset-0 select-none">
       {/* 왼쪽 절반 아무 데나 눌러 생기는 조이스틱 */}
       <div
         ref={areaRef}

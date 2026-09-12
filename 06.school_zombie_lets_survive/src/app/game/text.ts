@@ -28,7 +28,13 @@ export const MECHANIC_HINTS: Record<string, string> = {
   menu: "급식표 조각이 반짝여! 굳이 가봐야 보여.",
   map: "지도를 눌러 봐. 어디가 어딘지 다 보여!",
   dark: "깜깜해도 괜찮아, 손전등 있잖아!",
+  vent: "비밀 통로다! 꾹 눌러서 들어가 봐.",
 };
+
+/** 쫓기는 중에는 환풍구에 못 들어간다 (DESIGN §13-1) */
+export const VENT_DENY = "지금은 안 돼!";
+/** 남의 기록을 깼을 때 (DESIGN §13-3) */
+export const RECORD_BEATEN = "{상대이름}의 기록을 깼다!";
 
 /** 잠들었을 때 나오는 랜덤 한 줄 (10종) */
 export const SLEEP_LINES = [

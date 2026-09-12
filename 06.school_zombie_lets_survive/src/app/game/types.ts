@@ -10,7 +10,20 @@ export type Phase =
   | "playing"
   | "sleeping" // 잡혀서 같이 잠든 연출 중
   | "ritual" // 5-1 해독제 조합 연출
+  | "venting" // 환풍구 크롤 연출 중
   | "stageClear";
+
+/** 환풍구 입구를 가려 주는 소품 (전부 배경처럼 그려진다 — 하이라이트 없음) */
+export type VentProp =
+  | "hatch" // 급식실 배식구
+  | "bed" // 보건실 침대
+  | "cleaner" // 청소도구함
+  | "drum" // 큰북
+  | "easel" // 이젤
+  | "shelf" // 서가
+  | "vault" // 뜀틀
+  | "stand" // 스탠드
+  | "grille"; // 맨 그릴
 
 /** 잠든 연출의 변주 — 누구에게 잡혔는가 */
 export type SleepKind = "pillow" | "matron" | "boss" | "buddy";
@@ -82,6 +95,21 @@ export interface SectionDef {
   spawn: Vec;
 }
 
+/** 환풍구 한 쌍의 한쪽 끝 (맵 데이터) */
+export interface VentDef {
+  /** 타일 좌표 */
+  x: number;
+  y: number;
+  prop: VentProp;
+}
+
+export interface VentPairDef {
+  /** 전역 번호 0~7 (저장에 쓰인다) */
+  id: number;
+  a: VentDef;
+  b: VentDef;
+}
+
 export interface MatronPath {
   /** 타일 좌표 웨이포인트 루프 */
   points: Vec[];
@@ -112,6 +140,8 @@ export interface StageDef {
   matronPaths: MatronPath[];
   /** 배고픈 좀비(`Z`)의 손으로 찍은 경로 — 급식 테이블 뒤를 지나야 한다 */
   hungryPath?: MatronPath;
+  /** 환풍구 쌍. 한 쌍은 **인접한 두 방**만 잇는다 (DESIGN §13-1) */
+  vents: VentPairDef[];
   /** 이 스테이지에서 얻는 재료 두 개 (전역 재료 인덱스 0~7) */
   ingredients: [number, number];
   /** ASCII 맵에서 재료를 나타내는 글자 */
@@ -240,6 +270,20 @@ export interface Friend {
   bob: number;
   /** 이번 판에 점수를 줬는가 */
   scored: boolean;
+}
+
+/** 맵 위의 환풍구 한 쪽 */
+export interface VentEnt {
+  /** 전역 번호 0~7 */
+  id: number;
+  /** 같은 쌍의 반대쪽 (s.vents 안의 인덱스) */
+  other: number;
+  x: number;
+  y: number;
+  prop: VentProp;
+  found: boolean;
+  /** 진입 상호작용 진행도 (0~1) */
+  charge: number;
 }
 
 export interface ItemEnt {
@@ -404,6 +448,28 @@ export interface GameState {
   cardT: number;
   /** 상호작용 대상 */
   target: InteractTarget | null;
+  /** 맵 위의 환풍구 (쌍당 2개) */
+  vents: VentEnt[];
+  /** 크롤 연출 타이머 */
+  ventT: number;
+  /** 지금 기어가고 있는 환풍구 (s.vents 인덱스) */
+  ventFrom: number;
+  /** 아무 환풍구나 다시 쓸 수 있게 되기까지 */
+  ventCd: number;
+  /** "지금은 안 돼!" 거부 표시 */
+  ventDenyT: number;
+  /** 환풍구에서 막 나온 뒤의 무적 유예 (불공정한 즉사 방지) */
+  ventGrace: number;
+  /** 이번 판에 새로 찾은 환풍구 */
+  foundVents: boolean[];
+  /** 따라오는 친구들의 특기 (인덱스 = FRIENDS) */
+  friendPower: boolean[];
+  /** 특기 아이콘이 팝하는 타이머 */
+  powerPop: number[];
+  /** 방송 게이지를 지금 채우는 중인가 (환풍구 진입 금지) */
+  broadcastFilling: number;
+  /** 아직 못 구한 친구의 "여기야!" 타이머 */
+  callT: number;
   /** 상호작용 버튼을 누르고 있는가 */
   held: boolean;
   /** 이번 프레임에 새로 눌렀는가 */
@@ -445,10 +511,20 @@ export interface GameState {
   friendSeq: number;
   /** 가상 조이스틱을 잡고 있는가 (키보드 입력과 안 싸우게) */
   padActive: boolean;
+  /** 이번 판에 친구를 깨워서 받은 점수 */
+  friendScore: number;
 }
 
 export interface InteractTarget {
-  kind: "friend" | "item" | "door" | "locker" | "beaker" | "broadcast" | "exit";
+  kind:
+    | "friend"
+    | "item"
+    | "door"
+    | "locker"
+    | "beaker"
+    | "broadcast"
+    | "exit"
+    | "vent";
   x: number;
   y: number;
   index: number;
@@ -476,6 +552,12 @@ export interface HudState {
   stageId: number;
   hasIngredientA: boolean;
   hasIngredientB: boolean;
+  /** 찾은 환풍구 수 (전역 0~8) */
+  vents: number;
+  /** 따라오는 친구 (FRIENDS 인덱스) */
+  companions: number[];
+  /** 이번 스테이지 경과 시간 (ms) */
+  timeMs: number;
   /** 지금 어두운 방에 있는가 (손전등 버튼은 여기서만 나온다) */
   inDark: boolean;
 }

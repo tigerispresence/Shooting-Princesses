@@ -11,10 +11,12 @@ import {
   MINIMAP_MATRON_R,
   MINIMAP_W,
   MINIMAP_ZOMBIE_R,
+  FRIEND_POWER,
   PLAYER_R,
   TILE,
   TORCH_ANGLE,
   TORCH_RANGE,
+  VENT,
   VIEW_H,
   VIEW_W,
 } from "./constants";
@@ -39,13 +41,20 @@ import {
   drawNotice,
   drawPillarTile,
   drawPlayer,
+  drawFriendPowerIcon,
   drawStar,
+  drawVent,
+  drawVentCrawl,
   drawYawnBubble,
   drawZombie,
   roundRect,
 } from "./sprites";
-import { SLEEP_LINES, WAKE_LINE } from "./text";
+import { SLEEP_LINES, VENT_DENY, WAKE_LINE } from "./text";
 import type { GameState, Look, RoomDef } from "./types";
+
+function dist2(ax: number, ay: number, bx: number, by: number): number {
+  return Math.hypot(ax - bx, ay - by);
+}
 
 let darkCanvas: HTMLCanvasElement | null = null;
 
@@ -130,6 +139,21 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, look: Look):
 
   if (s.phase === "sleeping") drawSleepScene(ctx, s, look);
   if (s.phase === "ritual") drawRitual(ctx, s);
+  if (s.phase === "venting") {
+    drawVentCrawl(ctx, VIEW_W, VIEW_H, s.ventT, VENT.crawlMs + VENT.exitMs);
+  }
+  if (s.ventDenyT > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, s.ventDenyT / 300);
+    ctx.font = "bold 17px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.strokeText(VENT_DENY, VIEW_W / 2, VIEW_H / 2 - 60);
+    ctx.fillStyle = "#FF8F8F";
+    ctx.fillText(VENT_DENY, VIEW_W / 2, VIEW_H / 2 - 60);
+    ctx.restore();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +309,12 @@ function drawWorld(
     }
   }
 
+  // 환풍구 — 찾기 전에는 그냥 배경 소품이다 (하이라이트 없음)
+  for (const v of s.vents) {
+    if (hiddenByDark(s, v.x, v.y)) continue;
+    drawVent(ctx, v.x, v.y, v.prop, v.found, v.charge, t);
+  }
+
   // 물건
   for (const it of s.items) {
     if (it.taken) continue;
@@ -306,6 +336,14 @@ function drawWorld(
   for (const f of s.friends) {
     if (hiddenByDark(s, f.x, f.y)) continue;
     drawFriend(ctx, f.x, f.y, f.who, PLAYER_R, t, f.state !== "follow");
+    if (f.state === "follow") {
+      // 특기 아이콘은 항상 보이고, 특기가 실제로 발동하면 통통 튄다
+      const pop = s.powerPop[f.who] > 0 ? 1 + (s.powerPop[f.who] / 600) * 0.6 : 1;
+      ctx.save();
+      ctx.globalAlpha = s.powerPop[f.who] > 0 ? 1 : 0.85;
+      drawFriendPowerIcon(ctx, f.x, f.y - 26, 18 * pop, f.who);
+      ctx.restore();
+    }
     if (f.state === "asleep" && f.wakeT > 0) {
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       roundRect(ctx, f.x - 18, f.y - 34, 36, 6, 3);
@@ -463,7 +501,11 @@ function drawWorld(
               ? "숨기"
               : tgt.kind === "beaker"
                 ? "섞기"
-                : "방송 켜기";
+                : tgt.kind === "vent"
+                  ? s.vents[tgt.index]?.found
+                    ? "꾹 눌러 들어가기"
+                    : "살펴보기"
+                  : "방송 켜기";
     ctx.fillText(label, tgt.x, tgt.y - 37);
     ctx.restore();
   }
@@ -867,9 +909,32 @@ function drawMapInto(
     }
   }
 
-  // 친구
+  // 찾은 환풍구 = 청록 마름모 (못 찾은 건 아예 안 나온다)
+  for (const v of s.vents) {
+    if (!v.found) continue;
+    ctx.save();
+    ctx.translate(px(v.x), py(v.y));
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = COLORS.lockerTrim;
+    const r = big ? 6 : 3.4;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+  }
+
+  // 준호(먹보)가 따라오면 급식표 조각이 미니맵에 뜬다 — §M11 규칙을 푸는 것이 곧 보상이다
+  if (s.friendPower[2]) {
+    for (const it of s.items) {
+      if (it.taken || it.kind !== "menu") continue;
+      ctx.fillStyle = COLORS.menuPaper;
+      const r = big ? 6 : 3.4;
+      ctx.fillRect(px(it.x) - r, py(it.y) - r * 1.2, r * 2, r * 2.4);
+    }
+  }
+
+  // 친구 — 아직 못 구한 친구는 300px 안에서 하늘색 점으로 보인다 (휘슬 대신)
   for (const f of s.friends) {
     if (f.state === "follow") continue;
+    if (dist2(f.x, f.y, s.player.x, s.player.y) > FRIEND_POWER.minimapR) continue;
     ctx.fillStyle = COLORS.friendGlow;
     ctx.beginPath();
     ctx.arc(px(f.x), py(f.y), big ? 6 : 3.2, 0, Math.PI * 2);

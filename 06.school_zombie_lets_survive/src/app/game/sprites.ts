@@ -229,6 +229,15 @@ export function drawHat(
     ctx.ellipse(x, top - r * 0.1, r * 0.46, r * 0.3, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+  } else if (hat === "janitor") {
+    ctx.fillStyle = "#7FD4FF";
+    roundRect(ctx, x - r * 0.5, top - r * 0.06, r, r * 0.3, r * 0.1);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(x, top - r * 0.12, r * 0.4, r * 0.26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   } else if (hat === "pudding") {
     ctx.fillStyle = "#FFC2D6";
     ctx.beginPath();
@@ -1009,6 +1018,294 @@ export function drawChalkPileTile(
     ctx.fill();
     ctx.stroke();
   }
+}
+
+// ---------------------------------------------------------------------------
+// 환풍구 (DESIGN §13-1) — 미발견은 **그냥 배경 소품**이다. 하이라이트를 주지 않는다.
+// ---------------------------------------------------------------------------
+
+/** 벽에 붙은 환기 그릴 */
+function grille(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  ctx.fillStyle = "#7E8894";
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  roundRect(ctx, x - w / 2, y - h / 2, w, h, 3);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(30,28,44,0.55)";
+  ctx.lineWidth = 1.4;
+  for (let i = 1; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2 + 3, y - h / 2 + (h / 4) * i);
+    ctx.lineTo(x + w / 2 - 3, y - h / 2 + (h / 4) * i);
+    ctx.stroke();
+  }
+}
+
+/**
+ * 환풍구 한 쪽. 입구를 가려 주는 소품을 먼저 그리고 그 뒤에 그릴이 보인다.
+ * 찾기 전에는 다른 배경 소품과 똑같이 생겼다 — 그게 발견의 재미다.
+ */
+export function drawVent(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  prop: string,
+  found: boolean,
+  charge: number,
+  t: number,
+): void {
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = OUT;
+  switch (prop) {
+    case "hatch": // 급식실 배식구
+      ctx.fillStyle = "#C9CDD6";
+      roundRect(ctx, x - 15, y - 12, 30, 20, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#8E97A6";
+      roundRect(ctx, x - 12, y - 9, 24, 8, 2);
+      ctx.fill();
+      grille(ctx, x, y + 10, 22, 12);
+      break;
+    case "bed": // 보건실 침대
+      ctx.fillStyle = "#FFFFFF";
+      roundRect(ctx, x - 16, y - 10, 32, 20, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#BFD9F2";
+      roundRect(ctx, x - 14, y - 2, 28, 10, 3);
+      ctx.fill();
+      grille(ctx, x, y + 13, 20, 10);
+      break;
+    case "cleaner": // 청소도구함
+      ctx.fillStyle = "#A8B6A0";
+      roundRect(ctx, x - 11, y - 15, 22, 30, 3);
+      ctx.fill();
+      ctx.stroke();
+      // **가로 루버(살) 무늬 필수** — 사물함(숨는 곳)과 헷갈리면 안 된다.
+      // 청록 하이라이트 테두리는 숨을 수 있는 것에만 쓴다. 여기엔 절대 안 쓴다 (§14-3).
+      ctx.strokeStyle = "rgba(40,52,44,0.55)";
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x - 8, y - 11 + i * 5.5);
+        ctx.lineTo(x + 8, y - 11 + i * 5.5);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#3B3552";
+      ctx.beginPath();
+      ctx.arc(x + 7, y + 10, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case "drum": // 큰북
+      ctx.fillStyle = "#C9772F";
+      roundRect(ctx, x - 13, y - 11, 26, 22, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#FFF1DC";
+      ctx.beginPath();
+      ctx.ellipse(x - 8, y, 5, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      grille(ctx, x + 14, y, 10, 18);
+      break;
+    case "easel": // 이젤
+      ctx.strokeStyle = "#9A7A52";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y + 14);
+      ctx.lineTo(x, y - 14);
+      ctx.lineTo(x + 9, y + 14);
+      ctx.stroke();
+      ctx.fillStyle = "#F3EEE2";
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 1.6;
+      roundRect(ctx, x - 10, y - 10, 20, 14, 2);
+      ctx.fill();
+      ctx.stroke();
+      grille(ctx, x + 13, y + 6, 10, 14);
+      break;
+    case "shelf": // 서가
+      ctx.fillStyle = "#6B5A46";
+      roundRect(ctx, x - 14, y - 14, 28, 28, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#C09A6B";
+      for (let i = 0; i < 3; i++) ctx.fillRect(x - 11 + i * 8, y - 10, 5, 9);
+      grille(ctx, x, y + 9, 20, 8);
+      break;
+    case "vault": // 뜀틀
+      ctx.fillStyle = "#D7A96B";
+      for (let i = 0; i < 3; i++) {
+        roundRect(ctx, x - 14 + i, y - 12 + i * 8, 28 - i * 2, 8, 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      grille(ctx, x, y + 15, 18, 8);
+      break;
+    case "stand": // 스탠드 밑
+      ctx.fillStyle = "#B9BFC9";
+      for (let i = 0; i < 3; i++) {
+        roundRect(ctx, x - 15 + i * 3, y - 14 + i * 9, 30 - i * 6, 9, 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      grille(ctx, x, y + 14, 16, 8);
+      break;
+    default:
+      grille(ctx, x, y, 26, 20);
+      break;
+  }
+
+  if (found) {
+    // 찾은 뒤에는 청록 마름모가 붙는다 — 미니맵 표시와 같은 언어
+    ctx.save();
+    ctx.translate(x, y - 20);
+    ctx.rotate(Math.PI / 4);
+    ctx.globalAlpha = 0.75 + Math.sin(t * 0.005) * 0.25;
+    ctx.fillStyle = COLORS.lockerTrim;
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1.4;
+    roundRect(ctx, -4, -4, 8, 8, 1.5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (charge > 0) {
+    // 0.8초 진입 게이지 — 이 동안 무방비라는 게 이 메커닉의 값이다
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    roundRect(ctx, x - 18, y - 30, 36, 6, 3);
+    ctx.fill();
+    ctx.fillStyle = COLORS.lockerTrim;
+    roundRect(ctx, x - 17, y - 29, 34 * Math.min(1, charge), 4, 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** 관 속을 기어가는 연출 (1.2초 + 0.3초 등장) */
+export function drawVentCrawl(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  t: number,
+  total: number,
+): void {
+  const p = Math.min(1, t / total);
+  // 출구 0.3초 동안 관이 위아래로 열린다
+  const open = p < 0.78 ? 1 : 1 - (p - 0.78) / 0.22;
+  const lid = h * 0.4 * open;
+  ctx.save();
+  ctx.fillStyle = "#1B1730";
+  ctx.fillRect(0, 0, w, lid);
+  ctx.fillRect(0, h - lid, w, lid);
+
+  // 관 안쪽 — 위아래로 좁은 띠만 남는다
+  const top = lid;
+  const bot = h - lid;
+  const band = bot - top;
+  if (band > 4) {
+    const g = ctx.createLinearGradient(0, top, 0, bot);
+    g.addColorStop(0, "#2E2747");
+    g.addColorStop(0.5, "#4A4068");
+    g.addColorStop(1, "#2E2747");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, top, w, band);
+    // 이음매가 지나간다 = 앞으로 나아가는 느낌
+    ctx.strokeStyle = "rgba(255,255,255,0.13)";
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 8; i++) {
+      const x = ((i / 8 + p * 1.8) % 1) * w;
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bot);
+      ctx.stroke();
+    }
+    // 먼지
+    ctx.fillStyle = "rgba(255,240,200,0.6)";
+    for (let i = 0; i < 16; i++) {
+      const a = (i * 0.37 + p * 2.2) % 1;
+      ctx.globalAlpha = (1 - a) * 0.55;
+      ctx.beginPath();
+      ctx.arc(
+        w - ((i * 0.13 + a) % 1) * w,
+        top + band * ((i * 0.17 + 0.1) % 1),
+        1.6 + a * 2.4,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#FFE9B8";
+    ctx.font = "bold 16px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("스르륵…", w / 2, top + band / 2 + 5);
+  }
+  ctx.restore();
+}
+
+/** 친구 특기 아이콘 — 종이(준호) / 분필(다온) / 마이크(세은) / 시계(하늘) */
+export function drawFriendPowerIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  s: number,
+  who: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  switch (who) {
+    case 0: // 하늘 — 시계(유예 시간)
+      ctx.fillStyle = "#FFF3C4";
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -s * 0.2);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(s * 0.16, 0.04);
+      ctx.stroke();
+      break;
+    case 1: // 다온 — 분필
+      ctx.rotate(-0.6);
+      ctx.fillStyle = "#FFFFFF";
+      roundRect(ctx, -s * 0.32, -s * 0.11, s * 0.64, s * 0.22, s * 0.1);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case 2: // 준호 — 급식표 종이
+      ctx.fillStyle = COLORS.menuPaper;
+      roundRect(ctx, -s * 0.26, -s * 0.32, s * 0.52, s * 0.64, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.16, -s * 0.16 + i * s * 0.16);
+        ctx.lineTo(s * 0.16, -s * 0.16 + i * s * 0.16);
+        ctx.stroke();
+      }
+      break;
+    default: // 세은 — 마이크
+      ctx.fillStyle = "#8E86A8";
+      roundRect(ctx, -s * 0.11, -s * 0.34, s * 0.22, s * 0.42, s * 0.11);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.08);
+      ctx.lineTo(0, s * 0.3);
+      ctx.stroke();
+      break;
+  }
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------

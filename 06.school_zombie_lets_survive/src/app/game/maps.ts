@@ -295,6 +295,10 @@ export const STAGES: StageDef[] = [
     ingredients: [0, 1],
     ingredientChars: ["V", "G"],
     menuPieces: [0, 1],
+    // 급식실 배식구 뒤 ↔ 보건실 침대 뒤 — 중앙 복도 횡단(복도 좀비 1마리)을 건너뛴다
+    vents: [
+      { id: 0, a: { x: 11, y: 7, prop: "hatch" }, b: { x: 16, y: 7, prop: "bed" } },
+    ],
     matronPaths: [],
     // 배고픈 좀비는 급식 테이블(`TTT` 두 덩어리) **뒤쪽 행 1**을 지나 시야가 막힌 채 등장한다.
     // 이 경로가 이 좀비의 존재 이유다 (§M1-b) — 자동 생성으로는 보장되지 않는다.
@@ -348,6 +352,11 @@ export const STAGES: StageDef[] = [
     ingredients: [2, 3],
     ingredientChars: ["C", "Q"],
     menuPieces: [2, 3],
+    // ① 4학년 1반 ↔ 3반 (아주머니의 복도 순찰 1회) ② 복도 끝 ↔ 도서 준비실
+    vents: [
+      { id: 1, a: { x: 1, y: 1, prop: "cleaner" }, b: { x: 32, y: 1, prop: "cleaner" } },
+      { id: 2, a: { x: 31, y: 10, prop: "grille" }, b: { x: 21, y: 13, prop: "cleaner" } },
+    ],
     matronPaths: [
       {
         // 분필을 줍기 전까지는 복도 오른쪽 끝(x≈31)에 서서 하품만 한다.
@@ -399,6 +408,14 @@ export const STAGES: StageDef[] = [
     ingredients: [4, 5],
     ingredientChars: ["O", "J"],
     menuPieces: [4, 5],
+
+
+    // ① 음악실 큰북 뒤 ↔ 미술실 이젤 뒤 ② 미술실 구석 ↔ 도서관 서가 뒤
+    // 어두운 방 쪽 그릴은 손전등을 켜야만 보인다 (§13-1)
+    vents: [
+      { id: 3, a: { x: 14, y: 3, prop: "drum" }, b: { x: 16, y: 3, prop: "easel" } },
+      { id: 4, a: { x: 34, y: 8, prop: "shelf" }, b: { x: 34, y: 13, prop: "shelf" } },
+    ],
     matronPaths: [
       {
         points: [
@@ -447,6 +464,11 @@ export const STAGES: StageDef[] = [
     ingredients: [6, 7],
     ingredientChars: ["N", "H"],
     menuPieces: [6, 7],
+    // ① 체육관 뜀틀 뒤 ↔ 체육 창고 ② 스탠드 밑 ↔ 운동장 구석
+    vents: [
+      { id: 5, a: { x: 23, y: 2, prop: "vault" }, b: { x: 25, y: 2, prop: "cleaner" } },
+      { id: 6, a: { x: 42, y: 13, prop: "stand" }, b: { x: 42, y: 15, prop: "grille" } },
+    ],
     matronPaths: [
       {
         points: [
@@ -503,6 +525,11 @@ export const STAGES: StageDef[] = [
     ingredients: [0, 1],
     ingredientChars: ["@", "%"],
     menuPieces: [8, 9],
+    // 방송실 앞 좌측 구석 ↔ 우측 구석 (**같은 방 안**).
+    // 어떤 환풍구도 교장 복도(5-2)를 우회하지 않는다 — 우회로가 있으면 보스전이 사라진다.
+    vents: [
+      { id: 7, a: { x: 1, y: 2, prop: "grille" }, b: { x: 30, y: 2, prop: "grille" } },
+    ],
     matronPaths: [],
     sections: [
       {

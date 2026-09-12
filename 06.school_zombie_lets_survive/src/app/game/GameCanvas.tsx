@@ -31,8 +31,10 @@ export interface ClearResult {
   stageId: number;
   stars: number;
   score: number;
+  timeMs: number;
   menuPieces: boolean[];
   friendsMet: boolean[];
+  foundVents: boolean[];
   sleeps: number;
 }
 
@@ -41,6 +43,10 @@ interface Props {
   look: Look;
   playerName: string;
   menuPieces: boolean[];
+  foundVents: boolean[];
+  friendsMet: boolean[];
+  /** 남의 기록을 깼을 때 클리어 화면에 뜨는 한 줄 */
+  recordToast: string | null;
   practice: number | null;
   bgmOn: boolean;
   sfxOn: boolean;
@@ -50,6 +56,9 @@ interface Props {
   onExit: () => void;
   onNext: (() => void) | null;
 }
+
+/** 캔버스 바로 아래에 붙는 재료 줄 높이 */
+const INGREDIENT_ROW_H = 40;
 
 const EMPTY_HUD: HudState = {
   phase: "playing",
@@ -74,6 +83,9 @@ const EMPTY_HUD: HudState = {
   hasIngredientA: false,
   hasIngredientB: false,
   inDark: false,
+  vents: 0,
+  companions: [],
+  timeMs: 0,
 };
 
 export default function GameCanvas({
@@ -81,6 +93,9 @@ export default function GameCanvas({
   look,
   playerName,
   menuPieces,
+  foundVents,
+  friendsMet,
+  recordToast,
   practice,
   bgmOn,
   sfxOn,
@@ -119,6 +134,8 @@ export default function GameCanvas({
       stageId,
       playerName,
       menuPieces,
+      foundVents,
+      friendsMet,
       practiceZombies: practice,
     });
     clearedRef.current = false;
@@ -192,8 +209,14 @@ export default function GameCanvas({
     const el = wrapRef.current;
     if (!el) return;
     const fit = () => {
-      // 데스크톱에서는 화면 높이에 맞춰 키우되 1.6배까지만 (그 이상은 그림이 뭉갠다)
-      const k = Math.min(el.clientWidth / VIEW_W, el.clientHeight / VIEW_H, 1.6);
+      // 재료 줄(40px)은 캔버스 **바로 아래**에 붙는다. 그 몫을 빼고 캔버스 크기를 잡는다.
+      // 세로 예산: 52(상단) + 520(캔버스) + 40(재료 줄) = 612 → 컨트롤에 232px 남는다.
+      // 데스크톱에서는 화면 높이에 맞춰 키우되 1.6배까지만.
+      const k = Math.min(
+        el.clientWidth / VIEW_W,
+        (el.clientHeight - INGREDIENT_ROW_H) / VIEW_H,
+        1.6,
+      );
       setBox({ w: Math.floor(VIEW_W * k), h: Math.floor(VIEW_H * k) });
     };
     fit();
@@ -241,10 +264,17 @@ export default function GameCanvas({
       stageId,
       stars: hud.stars,
       score: hud.score,
+      timeMs: Math.round(s.elapsed),
       menuPieces: s.gotMenus.slice(),
-      friendsMet: s.friends.map((f) => f.state === "follow"),
+      // 스테이지 4에서 구출한 친구만 기록에 반영한다 (5에서는 이미 데리고 시작한다)
+      friendsMet: [0, 1, 2, 3].map(
+        (i) => friendsMet[i] === true || s.friends.some((f) => f.who === i && f.state === "follow"),
+      ),
+      foundVents: s.foundVents.slice(),
       sleeps: s.sleeps,
     });
+    // friendsMet은 게임을 만들 때 넘긴 값 그대로라 의존성에 넣을 필요가 없다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hud.phase, hud.stars, hud.score, stageId, onClear]);
 
   const doRestart = useCallback(() => {
@@ -395,8 +425,19 @@ export default function GameCanvas({
             {hud.score}
           </span>
         </div>
-        <div className="text-[13px] font-bold text-violet-100">
-          급식표 {hud.menus}/10
+        {/* 구역 이름은 정적인 텍스트라 여기 있어야 한다 — 아래 띠에 두면 버튼에 밀려 잘린다 */}
+        <div className="flex min-w-0 flex-col items-center leading-tight">
+          <span className="flex items-baseline gap-2 whitespace-nowrap">
+            <span className="text-[12px] font-bold text-violet-100">
+              급식표 {hud.menus}/10
+            </span>
+            <span className="text-[12px] font-bold text-teal-200/90">
+              환풍구 {hud.vents}/8
+            </span>
+          </span>
+          <span className="truncate whitespace-nowrap text-[11px] font-bold text-amber-200/85">
+            {hud.section}
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -435,7 +476,7 @@ export default function GameCanvas({
       </div>
 
       {/* 게임 화면 */}
-      <div ref={wrapRef} className="relative flex min-h-0 flex-1 items-start justify-center">
+      <div ref={wrapRef} className="relative flex min-h-0 flex-1 flex-col items-center">
         <div className="relative" style={{ width: box.w, height: box.h }}>
           <canvas
             ref={canvasRef}
@@ -478,6 +519,39 @@ export default function GameCanvas({
             aria-label="전체 지도 보기"
           />
 
+        </div>
+
+        {/* 재료 8칸 — **캔버스 바로 아래**. 화면 맨 아래에 두면 떠 있는 버튼이 덮는다 (§14-5).
+            동행 친구 아이콘 줄은 삭제했다 — 친구 머리 위 아이콘이 이미 같은 정보를 준다. */}
+        <div
+          className="flex shrink-0 items-center justify-between gap-[2px] px-1"
+          style={{ width: box.w, height: INGREDIENT_ROW_H }}
+        >
+          {INGREDIENTS.map((ing, i) => {
+            // 아직 못 얻은 칸도 **색은 그대로** 두고 흐리게만 한다.
+            const got = hud.ingredients[i];
+            return (
+              <div
+                key={ing.name}
+                className={`relative flex h-[34px] flex-1 items-center justify-center rounded-lg
+                            ${got ? "border border-amber-200/50 bg-amber-200/10" : "border border-dashed border-white/30"}`}
+                title={ing.name}
+                style={{ opacity: got ? 1 : 0.45 }}
+              >
+                <SpriteCanvas
+                  width={28}
+                  height={28}
+                  redraw={`${got}`}
+                  draw={(ctx, w) => drawIngredient(ctx, w / 2, w / 2, i, 0, 20)}
+                />
+                {got && (
+                  <span className="absolute -right-[1px] -top-[2px] text-[10px] font-bold leading-none text-emerald-300">
+                    ✓
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {!paused && !rotate && !mapOpen && hud.phase === "playing" && (
@@ -612,8 +686,14 @@ export default function GameCanvas({
                 <span className="tabular-nums">{clearBoard.total}</span>
               </div>
               <p className="pt-1 text-xs text-violet-300/70">
-                이번에 잔 횟수 {hud.sleeps}번
+                이번에 잔 횟수 {hud.sleeps}번 · 걸린 시간{" "}
+                {Math.floor(hud.timeMs / 1000)}초
               </p>
+              {recordToast && (
+                <p className="toast-pop pt-1 text-sm font-extrabold text-teal-200">
+                  {recordToast}
+                </p>
+              )}
             </div>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               {onNext && (
@@ -645,44 +725,6 @@ export default function GameCanvas({
         )}
       </div>
 
-      {/* 하단 띠 — 재료 8칸 + 구역 이름. 상단 띠와 같은 폭·같은 중심선. */}
-      <div
-        className="mx-auto flex h-[40px] w-full shrink-0 items-center justify-between gap-2 px-3"
-        style={{ maxWidth: box.w }}
-      >
-        <div className="flex items-center gap-[2px]">
-          {INGREDIENTS.map((ing, i) => {
-            // 아직 못 얻은 칸도 **색은 그대로** 두고 흐리게만 한다.
-            // 회색 실루엣으로 만들면 30px에서 뭘 더 모아야 하는지 안 읽힌다 (graphic-designer).
-            const got = hud.ingredients[i];
-            return (
-              <div
-                key={ing.name}
-                className={`relative flex h-[34px] w-[32px] items-center justify-center rounded-lg
-                            ${got ? "border border-amber-200/50 bg-amber-200/10" : "border border-dashed border-white/30"}`}
-                title={ing.name}
-                style={{ opacity: got ? 1 : 0.45 }}
-              >
-                <SpriteCanvas
-                  width={28}
-                  height={28}
-                  redraw={`${got}`}
-                  draw={(ctx, w) => drawIngredient(ctx, w / 2, w / 2, i, 0, 20)}
-                />
-                {got && (
-                  <span className="absolute -right-[1px] -top-[2px] text-[10px] font-bold leading-none text-emerald-300">
-                    ✓
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {/* 지도는 미니맵을 탭하거나 M 키로 연다 — 여기 버튼을 두면 손 버튼과 겹친다 */}
-        <span className="pointer-events-none text-[12px] font-bold text-violet-200/85">
-          {hud.section}
-        </span>
-      </div>
       <span className="hidden">{ingredientNames.join(",")}</span>
       <span className="hidden">{COLORS.itemGlow}</span>
     </div>
