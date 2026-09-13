@@ -5,6 +5,8 @@
  * 캐릭터는 원형 충돌체로 자유롭게 움직인다 (DESIGN.md §0).
  */
 
+import type { Difficulty, Tuning } from "./difficulty";
+
 /** 화면 흐름 단계 */
 export type Phase =
   | "playing"
@@ -400,6 +402,8 @@ export interface StageScore {
 export interface GameState {
   stageId: number;
   stage: StageDef;
+  /** 이 판에 굳어진 난이도 숫자들 (DESIGN §15) */
+  tune: Tuning;
   map: MapData;
   phase: Phase;
   /** 일시정지 (React가 켜고 끈다) */
@@ -560,6 +564,8 @@ export interface HudState {
   hasIngredientB: boolean;
   /** 찾은 환풍구 수 (전역 0~8) */
   vents: number;
+  difficulty: Difficulty;
+  scoreMult: number;
   /** 따라오는 친구 (FRIENDS 인덱스) */
   companions: number[];
   /** 이번 스테이지 경과 시간 (ms) */

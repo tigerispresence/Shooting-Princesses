@@ -2,11 +2,8 @@ import {
   ALARM,
   BOSS,
   COLORS,
-  BROADCAST_HOLD_MS,
-  BOSS_CATCH_DIST,
   BOSS_R,
   CAM_LERP,
-  CATCH_DIST,
   CHALK,
   DARK_VIEW_R,
   DOOR,
@@ -18,9 +15,7 @@ import {
   HIDE_ENTER_MS,
   HIDE_EXIT_DIST,
   HIDE_RECD_MS,
-  HUNGRY,
   INTERACT_DIST,
-  MATRON,
   MATRON_R,
   NEAR_MISS_IN,
   NEAR_MISS_OUT,
@@ -30,7 +25,6 @@ import {
   SKIP_AFTER_MS,
   TILE,
   FRIEND_POWER,
-  TORCH_NOTICE_MULT,
   VENT,
   VIEW_H,
   VIEW_W,
@@ -39,6 +33,8 @@ import {
   ZOMBIE_WAIT_MS,
 } from "./constants";
 import { FRIENDS, INGREDIENTS, STAGES, parseMap, tileAt } from "./maps";
+import { makeTuning } from "./difficulty";
+import type { Difficulty } from "./difficulty";
 import {
   playAlarmRing,
   playBroadcastTick,
@@ -373,12 +369,16 @@ export interface CreateOpts {
   foundVents: boolean[];
   /** 구출해 둔 친구 — 스테이지 5에는 이 친구들이 따라 들어온다 */
   friendsMet: boolean[];
+  /** 난이도. 없으면 보통 (= v0.6의 숫자 그대로) */
+  difficulty?: Difficulty;
   practiceZombies?: number | null;
 }
 
 export function createGame(opts: CreateOpts): GameState {
   const stage = STAGES.find((s) => s.id === opts.stageId) ?? STAGES[0];
   const map = parseMap(stage);
+  // 난이도는 판이 만들어질 때 숫자로 굳는다. 시작한 뒤에는 못 바꾼다 (기록이 오염된다).
+  const tune = makeTuning(opts.difficulty ?? "normal", stage);
 
   const player: Player = {
     x: 0,
@@ -394,7 +394,7 @@ export function createGame(opts: CreateOpts): GameState {
     hideAimT: 0,
     hideExits: 0,
     torchOn: false,
-    alarms: stage.startAlarms,
+    alarms: tune.startAlarms,
     chalkCd: 0,
     lockerCd: new Map(),
   };
@@ -402,6 +402,7 @@ export function createGame(opts: CreateOpts): GameState {
   const s: GameState = {
     stageId: stage.id,
     stage,
+    tune,
     map,
     phase: "playing",
     paused: false,
@@ -603,6 +604,21 @@ export function createGame(opts: CreateOpts): GameState {
     }
   }
 
+  // 어려움 — 스테이지 2~5에서 일반 좀비 **1마리를 배고픈 좀비로 교체**한다.
+  // 추가가 아니라 교체라 §11-C 구역별 내역과 부록 A가 그대로 맞는다.
+  if (tune.swapOneHungry && tune.hungry) {
+    const victim = s.zombies.find((z) => z.kind === "basic");
+    if (victim) {
+      victim.kind = "hungry";
+      victim.patrolSpeed = tune.hungry.patrol;
+      victim.chaseSpeed = tune.hungry.chase;
+      victim.noticeR = tune.hungry.notice;
+      victim.noticeDelay = tune.hungry.delay;
+      victim.giveupMs = tune.hungry.giveup;
+      victim.variant = 0;
+    }
+  }
+
   // 연습 모드 — 좀비 수를 직접 줄여서 마음껏 돌아다닌다
   if (s.practiceZombies !== null) {
     s.zombies = s.zombies.slice(0, Math.max(0, s.practiceZombies));
@@ -641,8 +657,10 @@ export function createGame(opts: CreateOpts): GameState {
 }
 
 function makeZombie(s: GameState, kind: "basic" | "hungry", at: Vec, seed: number): Zombie {
-  const st = s.stage;
-  const base = kind === "hungry" ? HUNGRY : null;
+  // 쉬움에서는 배고픈 좀비가 없다 — 일반 좀비로 강등한다
+  const hungry = kind === "hungry" ? s.tune.hungry : null;
+  if (kind === "hungry" && !hungry) kind = "basic";
+  const base = hungry ?? s.tune.basic;
   const rnd = rng(seed * 31 + 7);
   // LCG는 이웃한 씨앗의 첫 출력이 붙어 있어서, 그대로 쓰면 한 스테이지의 좀비가
   // 전부 같은 앞머리를 달고 나온다. 두 번 돌려서 흩어 놓는다.
@@ -654,11 +672,11 @@ function makeZombie(s: GameState, kind: "basic" | "hungry", at: Vec, seed: numbe
     x: at.x,
     y: at.y,
     r: ZOMBIE_R,
-    patrolSpeed: base ? base.patrol : st.patrolSpeed,
-    chaseSpeed: base ? base.chase : st.chaseSpeed,
-    noticeR: base ? base.notice : st.noticeR,
-    noticeDelay: base ? base.delay : st.noticeDelay,
-    giveupMs: base ? base.giveup : st.giveupMs,
+    patrolSpeed: base.patrol,
+    chaseSpeed: base.chase,
+    noticeR: base.notice,
+    noticeDelay: base.delay,
+    giveupMs: base.giveup,
     state: "patrol",
     t: 0,
     path: [],
@@ -699,11 +717,11 @@ function makeMatron(s: GameState, at: Vec, points: Vec[]): Zombie {
   z.variant = 0;
   z.phase = 0;
   z.bobAmp = 1;
-  z.patrolSpeed = MATRON.patrol;
-  z.chaseSpeed = MATRON.chase;
-  z.noticeR = MATRON.notice;
-  z.noticeDelay = MATRON.delay;
-  z.giveupMs = MATRON.giveup;
+  z.patrolSpeed = s.tune.matron.patrol;
+  z.chaseSpeed = s.tune.matron.chase;
+  z.noticeR = s.tune.matron.notice;
+  z.noticeDelay = s.tune.matron.delay;
+  z.giveupMs = s.tune.matron.giveup;
   z.routePoints = points;
   z.path = points;
   z.stops = [];
@@ -806,7 +824,7 @@ export function throwChalk(s: GameState): void {
   if (s.player.chalkCd > 0) return;
   // 다온(미술부)이 따라오면 분필을 더 자주 던질 수 있다 — 분필을 죽이는 게 아니라 더 쓰게 만든다
   const fast = s.friendPower[1];
-  s.player.chalkCd = fast ? FRIEND_POWER.chalkCd : CHALK.cd;
+  s.player.chalkCd = fast ? s.tune.chalkCdFast : s.tune.chalkCd;
   if (fast) s.powerPop[1] = 600;
   const a = s.aim ?? s.player.face;
   s.chalks.push({
@@ -1249,11 +1267,11 @@ function updateInteraction(s: GameState, dtMs: number): void {
       const mult = s.friendPower[3] ? FRIEND_POWER.broadcastMult : 1;
       if (mult > 1) s.powerPop[3] = 400;
       s.broadcastFilling = 250;
-      s.broadcast = Math.min(BROADCAST_HOLD_MS, s.broadcast + dtMs * mult);
+      s.broadcast = Math.min(s.tune.broadcastHold, s.broadcast + dtMs * mult);
       if (Math.floor(before / 250) !== Math.floor(s.broadcast / 250)) {
-        playBroadcastTick(s.broadcast / BROADCAST_HOLD_MS);
+        playBroadcastTick(s.broadcast / s.tune.broadcastHold);
       }
-      if (s.broadcast >= BROADCAST_HOLD_MS) finishStage(s);
+      if (s.broadcast >= s.tune.broadcastHold) finishStage(s);
       return;
     }
   }
@@ -1472,7 +1490,7 @@ function takeItem(s: GameState, it: ItemEnt): void {
     playSfx("paper");
     hint(s, "menu");
   } else {
-    s.player.alarms = Math.min(ALARM.max, s.player.alarms + 1);
+    s.player.alarms = Math.min(s.tune.alarmMax, s.player.alarms + 1);
     playSfx("alarmSet");
     spawnSparks(s, it.x, it.y, "#FFC93C", 8);
   }
@@ -1562,7 +1580,7 @@ function makeNoise(
     if (z.stallT > 0 && !keepHolding) continue;
     const d = dist(z.x, z.y, x, y);
     if (d > radius) continue;
-    const ms = z.kind === "matron" && !keepHolding ? MATRON.distractMs : holdMs;
+    const ms = z.kind === "matron" && !keepHolding ? s.tune.matron.distractMs : holdMs;
     if (keepHolding) {
       // 알람시계 — 시계 쪽으로 와서 울리는 내내 붙잡힌다
       if (d < 36) {
@@ -1604,7 +1622,7 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
     let noticeR = z.noticeR;
     const tile = tileAt(s.map, tileOf(p.x), tileOf(p.y));
     const room = tile && tile.room >= 0 ? s.map.rooms[tile.room] : null;
-    if (p.torchOn && room?.dark) noticeR *= TORCH_NOTICE_MULT;
+    if (p.torchOn && room?.dark) noticeR *= s.tune.torchMult;
     const dp = dist(z.x, z.y, p.x, p.y);
     const sees =
       !hidden && dp <= noticeR && hasLineOfSight(s.map, z.x, z.y, p.x, p.y);
@@ -1638,6 +1656,13 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
         if (sees) {
           z.lastSeen = { x: p.x, y: p.y };
           z.t = z.giveupMs;
+        } else if (s.tune.dropChaseOnLos) {
+          // 쉬움 — 모퉁이를 돌면 놓친다. 7살의 본능("벽 뒤로 숨는다")을 항상 정답으로 만든다.
+          // 마지막 목격 지점까지는 느긋하게 걸어가므로 화면상으론 똑같아 보인다.
+          z.state = "investigate";
+          z.goal = z.lastSeen;
+          z.t = 1200;
+          z.route = [];
         } else {
           z.t -= dtMs;
           if (z.t <= 0) {
@@ -1703,7 +1728,7 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
     }
 
     // 잡힘 (환풍구에서 막 나온 0.6초 동안은 잡히지 않는다)
-    if (!hidden && s.phase === "playing" && s.ventGrace <= 0 && dp < CATCH_DIST) {
+    if (!hidden && s.phase === "playing" && s.ventGrace <= 0 && dp < s.tune.catchDist) {
       caught(s, z.kind === "matron" ? "matron" : hasFollower(s) ? "buddy" : "pillow");
     }
   }
@@ -1905,7 +1930,7 @@ function updateFriends(s: GameState, dt: number, dtMs: number): void {
     // 좀비에 닿으면 그 자리에서 잠들고, 좀비는 2초간 같이 하품한다
     for (const z of s.zombies) {
       if (z.stallT > 0) continue;
-      if (dist(z.x, z.y, f.x, f.y) < CATCH_DIST + 2) {
+      if (dist(z.x, z.y, f.x, f.y) < s.tune.catchDist + 2) {
         f.state = "down";
         f.wakeT = 0;
         z.stallT = FRIEND_STALL_MS;
@@ -1947,8 +1972,8 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
 
   switch (b.phase) {
     case "walk":
-      if (p.hiding < 0) moveToward2(s, b, p.x, p.y, BOSS.walkSpeed, dt);
-      if (dp < BOSS_CATCH_DIST && p.hiding < 0 && s.ventGrace <= 0) caught(s, "boss");
+      if (p.hiding < 0) moveToward2(s, b, p.x, p.y, s.tune.bossWalkSpeed, dt);
+      if (dp < s.tune.bossCatchDist && p.hiding < 0 && s.ventGrace <= 0) caught(s, "boss");
       if (b.t >= BOSS.walkMs) {
         b.phase = "windup";
         b.t = 0;
@@ -1956,7 +1981,7 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
       }
       break;
     case "windup":
-      if (dp < BOSS_CATCH_DIST && p.hiding < 0 && s.ventGrace <= 0) caught(s, "boss");
+      if (dp < s.tune.bossCatchDist && p.hiding < 0 && s.ventGrace <= 0) caught(s, "boss");
       if (b.t >= BOSS.windupMs) {
         b.phase = "speech";
         b.t = 0;
@@ -1968,7 +1993,7 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
       }
       break;
     case "speech": {
-      b.radius = BOSS.sleepR * Math.min(1, b.t / BOSS.expandMs);
+      b.radius = s.tune.bossSleepR * Math.min(1, b.t / BOSS.expandMs);
       if (Math.floor((b.t - dtMs) / 420) !== Math.floor(b.t / 420)) playSpeechSyllable();
       // 눈을 감고 있어 몸통 충돌은 꺼진다. 벽·기둥에 막히면 안전하다.
       if (
@@ -2062,7 +2087,7 @@ export function restartFromCheckpoint(s: GameState): void {
   s.player.hideT = 0;
   s.player.chalkCd = 0;
   s.player.lockerCd.clear();
-  s.player.alarms = Math.max(s.player.alarms, s.stage.startAlarms);
+  s.player.alarms = Math.max(s.player.alarms, s.tune.startAlarms);
   s.chalks.length = 0;
   s.alarms.length = 0;
   s.ventT = 0;
@@ -2149,6 +2174,8 @@ function finishStage(s: GameState): void {
     board.stealth +
     board.fresh +
     board.nearMiss;
+  // 어려움 ×1.5 — 벌이 아니라 동경의 대상이다 (쉬움에 벌점은 주지 않는다)
+  board.total = Math.round(board.total * s.tune.scoreMult);
   s.score = board.total;
   s.score_ = board;
   s.rescued = awake;
@@ -2238,7 +2265,7 @@ export function toHud(s: GameState): HudState {
     sleepLine: s.sleepLine,
     canSkip: s.phase === "sleeping" && s.sleepT > SKIP_AFTER_MS,
     showRestart: s.phase === "sleeping" && s.sleepT >= GAMEOVER_MS,
-    broadcast: Math.round((s.broadcast / BROADCAST_HOLD_MS) * 100),
+    broadcast: Math.round((s.broadcast / s.tune.broadcastHold) * 100),
     showBroadcast: s.stageId === 5 && (s.visited[2] || s.broadcast > 0),
     stars: s.score_?.stars ?? 0,
     scoreBoard: s.score_,
@@ -2248,6 +2275,8 @@ export function toHud(s: GameState): HudState {
     hasIngredientB: s.gotIngredients[stageIngredients[1]],
     inDark,
     vents: s.foundVents.filter(Boolean).length,
+    difficulty: s.tune.id,
+    scoreMult: s.tune.scoreMult,
     companions: s.friends.filter((f) => f.state === "follow").map((f) => f.who),
     timeMs: Math.round(s.elapsed / 1000) * 1000,
   };

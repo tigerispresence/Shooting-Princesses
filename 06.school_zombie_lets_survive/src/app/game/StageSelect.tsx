@@ -8,6 +8,8 @@ import SpriteCanvas from "./SpriteCanvas";
 import { MENU_ITEMS, MENU_MATRON, MENU_SCREEN_TITLE, fill } from "./text";
 import { recordFor } from "./storage";
 import type { SaveData } from "./storage";
+import { DIFFICULTIES, DIFFICULTY_DESC, DIFFICULTY_LABEL } from "./difficulty";
+import type { Difficulty } from "./difficulty";
 
 interface Props {
   save: SaveData;
@@ -15,6 +17,7 @@ interface Props {
   onPick: (stageId: number, practice: number | null) => void;
   onBack: () => void;
   onEnding: () => void;
+  onDifficulty: (d: Difficulty) => void;
 }
 
 interface BoardRow {
@@ -22,27 +25,40 @@ interface BoardRow {
   score: string;
   time: string;
   leader: boolean;
+  diff: string;
 }
 
-/** 최근 이름 두 개의 기록. 이름이 하나뿐이면 한 줄만 나온다 (빈 칸을 보여주지 않는다). */
+/**
+ * 최근 이름 두 개의 기록. 이름이 하나뿐이면 한 줄만 나온다 (빈 칸을 보여주지 않는다).
+ * **지금 고른 난이도의 기록만** 보여 주고, 왕관도 그 안에서만 비교한다 (§15-3).
+ */
 function boardFor(save: SaveData, stageId: number): BoardRow[] {
   const i = stageId - 1;
-  const names = save.recentNames.filter((n) => recordFor(save, n).best[i] > 0).slice(0, 2);
+  const d = save.difficulty;
+  const names = save.recentNames.filter((n) => recordFor(save, n, d).best[i] > 0).slice(0, 2);
   if (!names.length) return [];
-  const top = Math.max(...names.map((n) => recordFor(save, n).best[i]));
+  const top = Math.max(...names.map((n) => recordFor(save, n, d).best[i]));
   return names.map((n) => {
-    const rec = recordFor(save, n);
+    const rec = recordFor(save, n, d);
     const sec = rec.bestTimeMs[i] > 0 ? Math.round(rec.bestTimeMs[i] / 1000) : 0;
     return {
       name: n,
       score: `${rec.best[i]}점`,
       time: sec > 0 ? `${sec}초` : "-",
       leader: rec.best[i] === top && names.length > 1,
+      diff: DIFFICULTY_LABEL[d],
     };
   });
 }
 
-export default function StageSelect({ save, playerName, onPick, onBack, onEnding }: Props) {
+export default function StageSelect({
+  save,
+  playerName,
+  onPick,
+  onBack,
+  onEnding,
+  onDifficulty,
+}: Props) {
   const [tab, setTab] = useState<"stage" | "menu">("stage");
   const [practice, setPractice] = useState<number | null>(null);
   const totalStars = save.stars.reduce((a, b) => a + b, 0);
@@ -127,6 +143,9 @@ export default function StageSelect({ save, playerName, onPick, onBack, onEnding
                       >
                         {row.leader ? "♔ " : ""}
                         {row.name} · {row.score} · {row.time}
+                        <span className="ml-1 rounded bg-black/25 px-1 text-[9px]">
+                          {row.diff}
+                        </span>
                       </p>
                     ))}
                 </div>
@@ -143,6 +162,33 @@ export default function StageSelect({ save, playerName, onPick, onBack, onEnding
               </button>
             );
           })}
+
+          {/* 난이도 — 아무 때나 바꿀 수 있다. 스테이지가 시작되면 그 판 동안 잠긴다. */}
+          <div className="mt-2 rounded-2xl border border-white/20 bg-white/5 p-3">
+            <p className="text-sm font-bold text-amber-100">난이도</p>
+            <div className="mt-2 flex gap-2">
+              {DIFFICULTIES.map((d) => (
+                <button
+                  key={d}
+                  className={`flex-1 rounded-xl border-2 px-2 py-2 text-sm font-bold touch-none select-none
+                              ${save.difficulty === d ? "border-amber-200 bg-amber-300/20 text-amber-100" : "border-white/25 text-violet-200"}`}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    playSfx("uiTap");
+                    onDifficulty(d);
+                  }}
+                >
+                  {DIFFICULTY_LABEL[d]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-violet-200/80">
+              {DIFFICULTY_DESC[save.difficulty]}
+            </p>
+            <p className="mt-1 text-[11px] text-violet-300/60">
+              난이도를 바꿔도 별·급식표·환풍구·모자는 그대로예요. 기록만 따로 저장돼요.
+            </p>
+          </div>
 
           {save.ending && (
             <div className="mt-2 rounded-2xl border border-white/20 bg-white/5 p-3">

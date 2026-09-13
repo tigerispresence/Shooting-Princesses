@@ -9,9 +9,18 @@ import { stopMusic } from "./music";
 import NameEntry from "./NameEntry";
 import StageSelect from "./StageSelect";
 import TitleScreen from "./TitleScreen";
-import { emptySave, load, recordFor, refreshHats, save as writeSave } from "./storage";
+import {
+  emptyNameRecords,
+  emptySave,
+  load,
+  recordFor,
+  recordsFor,
+  refreshHats,
+  save as writeSave,
+} from "./storage";
 import type { SaveData } from "./storage";
 import { RECORD_BEATEN } from "./text";
+import type { Difficulty } from "./difficulty";
 import type { Look } from "./types";
 
 type Screen = "title" | "name" | "stage" | "play" | "ending";
@@ -64,24 +73,32 @@ export default function App() {
       const me = data.name || "친구";
       const i = r.stageId - 1;
 
-      // --- 이름별 기록판 (DESIGN §13-3) ---
+      // --- 이름별·난이도별 기록판 (DESIGN §13-3 + §15-3) ---
       // 진행도는 그대로 하나를 공유한다. 늘어나는 건 기록 칸 하나뿐이다.
-      const mine = recordFor(data, me);
+      // **왕관과 기록 갱신은 같은 난이도끼리만 비교한다** — 쉬움으로 기록을 빼앗을 수 없다.
+      const diff = data.difficulty;
+      const mine = recordFor(data, me, diff);
       const beaten = Object.entries(data.records)
         .filter(([n]) => n !== me)
-        .filter(([, rec]) => rec.best[i] > 0 && r.score > rec.best[i])
+        .filter(([, rec]) => rec[diff].best[i] > 0 && r.score > rec[diff].best[i])
         // 내가 이미 그 기록을 넘어선 적이 있으면 새삼 알리지 않는다
-        .filter(([, rec]) => mine.best[i] <= rec.best[i])
-        .sort((a, b) => b[1].best[i] - a[1].best[i])[0];
+        .filter(([, rec]) => mine.best[i] <= rec[diff].best[i])
+        .sort((a, b) => b[1][diff].best[i] - a[1][diff].best[i])[0];
       setRecordToast(beaten ? RECORD_BEATEN.replace("{상대이름}", beaten[0]) : null);
 
+      const mineAll = recordsFor(data, me);
       next.records = { ...data.records };
       next.records[me] = {
-        best: [...mine.best],
-        bestTimeMs: [...mine.bestTimeMs],
+        ...emptyNameRecords(),
+        ...mineAll,
+        lastDifficulty: diff,
+        [diff]: {
+          best: [...mine.best],
+          bestTimeMs: [...mine.bestTimeMs],
+        },
       };
-      next.records[me].best[i] = Math.max(mine.best[i], r.score);
-      next.records[me].bestTimeMs[i] =
+      next.records[me][diff].best[i] = Math.max(mine.best[i], r.score);
+      next.records[me][diff].bestTimeMs[i] =
         mine.bestTimeMs[i] > 0 ? Math.min(mine.bestTimeMs[i], r.timeMs) : r.timeMs;
       next.recentNames = [me, ...data.recentNames.filter((n) => n !== me)].slice(0, 4);
 
@@ -128,7 +145,9 @@ export default function App() {
         unlockedHats={data.unlockedHats}
         onBack={() => setScreen("title")}
         onDone={(name, look: Look) => {
-          persist({ ...data, name, look });
+          // 그 이름이 마지막에 쓰던 난이도로 자동 복귀한다 (자매 교대)
+          const back = data.records[name]?.lastDifficulty;
+          persist({ ...data, name, look, difficulty: back ?? data.difficulty });
           stopMusic();
           setScreen("stage");
         }}
@@ -143,6 +162,7 @@ export default function App() {
         playerName={data.name || "친구"}
         onBack={() => setScreen("title")}
         onEnding={() => setScreen("ending")}
+        onDifficulty={(d: Difficulty) => persist({ ...data, difficulty: d })}
         onPick={(id, p) => {
           setStageId(id);
           setPractice(p);
@@ -176,6 +196,7 @@ export default function App() {
       foundVents={data.vents}
       friendsMet={data.friendsMet}
       recordToast={recordToast}
+      difficulty={data.difficulty}
       practice={practice}
       bgmOn={data.bgmOn}
       sfxOn={data.sfxOn}

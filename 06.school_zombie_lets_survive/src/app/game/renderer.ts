@@ -1,11 +1,9 @@
 import {
   ALARM,
   BOSS_R,
-  BROADCAST_HOLD_MS,
   CHALK,
   COLORS,
   DARK_EYE_GLOW_R,
-  DARK_VIEW_R,
   GAMEOVER_MS,
   MINIMAP_H,
   MINIMAP_MATRON_R,
@@ -233,7 +231,7 @@ function drawWorld(
       if (tile.exit) drawExitTile(ctx, px, py, s.exitOpen, t);
       if (tile.beaker) drawBeakerTile(ctx, px, py, s.exitOpen, t);
       if (tile.broadcast) {
-        drawBroadcastDoorTile(ctx, px, py, s.broadcast / BROADCAST_HOLD_MS, t);
+        drawBroadcastDoorTile(ctx, px, py, s.broadcast / s.tune.broadcastHold, t);
       }
       if (tile.chalkPile) drawChalkPileTile(ctx, px, py);
     }
@@ -549,7 +547,7 @@ function drawDarkness(
   dctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
   dctx.globalCompositeOperation = "destination-out";
-  const r = DARK_VIEW_R * scale;
+  const r = s.tune.darkViewR * scale;
   const g = dctx.createRadialGradient(px, py, r * 0.25, px, py, r);
   g.addColorStop(0, "rgba(0,0,0,1)");
   g.addColorStop(0.7, "rgba(0,0,0,0.75)");
@@ -693,7 +691,7 @@ function drawOverlays(
     const w = VIEW_W - 60;
     const x = 30;
     const y = VIEW_H - 74;
-    const ratio = s.broadcast / BROADCAST_HOLD_MS;
+    const ratio = s.broadcast / s.tune.broadcastHold;
     ctx.save();
     ctx.fillStyle = "rgba(20,16,40,0.72)";
     roundRect(ctx, x, y, w, 26, 13);

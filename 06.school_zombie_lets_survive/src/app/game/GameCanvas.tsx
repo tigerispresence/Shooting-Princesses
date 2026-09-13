@@ -25,6 +25,8 @@ import * as sprites from "./sprites";
 import { drawIngredient, drawPauseIcon, drawSoundIcon } from "./sprites";
 import SpriteCanvas from "./SpriteCanvas";
 import TouchControls from "./TouchControls";
+import { DIFFICULTY_LABEL } from "./difficulty";
+import type { Difficulty } from "./difficulty";
 import type { GameState, HudState, Look, StageScore } from "./types";
 
 export interface ClearResult {
@@ -47,6 +49,7 @@ interface Props {
   friendsMet: boolean[];
   /** 남의 기록을 깼을 때 클리어 화면에 뜨는 한 줄 */
   recordToast: string | null;
+  difficulty: Difficulty;
   practice: number | null;
   bgmOn: boolean;
   sfxOn: boolean;
@@ -86,6 +89,8 @@ const EMPTY_HUD: HudState = {
   vents: 0,
   companions: [],
   timeMs: 0,
+  difficulty: "normal",
+  scoreMult: 1,
 };
 
 export default function GameCanvas({
@@ -96,6 +101,7 @@ export default function GameCanvas({
   foundVents,
   friendsMet,
   recordToast,
+  difficulty,
   practice,
   bgmOn,
   sfxOn,
@@ -136,6 +142,7 @@ export default function GameCanvas({
       menuPieces,
       foundVents,
       friendsMet,
+      difficulty,
       practiceZombies: practice,
     });
     clearedRef.current = false;
@@ -200,7 +207,7 @@ export default function GameCanvas({
     return () => cancelAnimationFrame(raf);
     // look은 그리기에만 쓰여서 다시 만들 필요가 없다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageId, playerName, practice]);
+  }, [stageId, playerName, practice, difficulty]);
 
   useEffect(() => () => stopMusic(), []);
 
@@ -435,8 +442,22 @@ export default function GameCanvas({
               환풍구 {hud.vents}/8
             </span>
           </span>
-          <span className="truncate whitespace-nowrap text-[11px] font-bold text-amber-200/85">
-            {hud.section}
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            {/* 지금 어느 모드인지 부모가 한눈에 알아야 한다 (기록이 헷갈리지 않게) */}
+            <span
+              className={`rounded px-1 text-[10px] font-bold ${
+                hud.difficulty === "easy"
+                  ? "bg-emerald-300/25 text-emerald-200"
+                  : hud.difficulty === "hard"
+                    ? "bg-rose-400/25 text-rose-200"
+                    : "bg-white/12 text-violet-200"
+              }`}
+            >
+              {DIFFICULTY_LABEL[hud.difficulty]}
+            </span>
+            <span className="truncate text-[11px] font-bold text-amber-200/85">
+              {hud.section}
+            </span>
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -681,6 +702,12 @@ export default function GameCanvas({
               {clearBoard.stealth > 0 && <Row label="들키지 않았어!" value={clearBoard.stealth} />}
               {clearBoard.fresh > 0 && <Row label="쌩쌩해요!" value={clearBoard.fresh} />}
               {clearBoard.nearMiss > 0 && <Row label="아슬아슬" value={clearBoard.nearMiss} />}
+              {hud.scoreMult !== 1 && (
+                <div className="flex justify-between text-rose-200">
+                  <span>어려움 보너스</span>
+                  <span className="tabular-nums">×{hud.scoreMult}</span>
+                </div>
+              )}
               <div className="mt-1 flex justify-between border-t border-white/20 pt-1 text-base font-extrabold text-amber-200">
                 <span>합계</span>
                 <span className="tabular-nums">{clearBoard.total}</span>

@@ -1,3 +1,5 @@
+import { isDifficulty } from "./difficulty";
+import type { Difficulty } from "./difficulty";
 import type { Look } from "./types";
 
 /**
@@ -13,6 +15,17 @@ export interface NameRecord {
   bestTimeMs: number[];
 }
 
+/**
+ * 난이도별 기록 + 그 이름이 마지막에 쓰던 난이도.
+ * `lastDifficulty`가 핵심이다 — 자매가 번갈아 할 때 이름만 고르면 각자의 난이도로 맞춰진다.
+ */
+export interface NameRecords {
+  lastDifficulty: Difficulty;
+  easy: NameRecord;
+  normal: NameRecord;
+  hard: NameRecord;
+}
+
 export interface SaveData {
   name: string;
   look: Look;
@@ -25,8 +38,10 @@ export interface SaveData {
   unlockedHats: string[];
   /** 찾은 환풍구 8칸 (한 번 찾으면 영원히) */
   vents: boolean[];
-  /** 이름별 최고 점수·최단 시간 */
-  records: Record<string, NameRecord>;
+  /** 지금 고른 난이도. 없으면 보통 */
+  difficulty: Difficulty;
+  /** 이름별·난이도별 최고 점수·최단 시간 */
+  records: Record<string, NameRecords>;
   /** 기록판에 보여 줄 최근 이름 (최신 순) */
   recentNames: string[];
   bgmOn: boolean;
@@ -47,6 +62,7 @@ export function emptySave(): SaveData {
     sleepCount: 0,
     unlockedHats: [],
     vents: new Array(8).fill(false),
+    difficulty: "normal",
     records: {},
     recentNames: [],
     bgmOn: true,
@@ -71,6 +87,7 @@ export function load(): SaveData {
       menuPieces: fixArray(parsed.menuPieces, 10, false),
       friendsMet: fixArray(parsed.friendsMet, 4, false),
       vents: fixArray(parsed.vents, 8, false),
+      difficulty: isDifficulty(parsed.difficulty) ? parsed.difficulty : "normal",
       records: normalizeRecords(parsed.records),
       recentNames: Array.isArray(parsed.recentNames)
         ? parsed.recentNames.filter((n): n is string => typeof n === "string")
@@ -101,22 +118,52 @@ function fixArray<T>(value: unknown, len: number, fallback: T): T[] {
   return out;
 }
 
-function normalizeRecords(value: unknown): Record<string, NameRecord> {
-  const out: Record<string, NameRecord> = {};
+function emptyRecord(): NameRecord {
+  return { best: [0, 0, 0, 0, 0], bestTimeMs: [0, 0, 0, 0, 0] };
+}
+
+export function emptyNameRecords(): NameRecords {
+  return {
+    lastDifficulty: "normal",
+    easy: emptyRecord(),
+    normal: emptyRecord(),
+    hard: emptyRecord(),
+  };
+}
+
+function oneRecord(value: unknown): NameRecord {
+  const r = (value ?? {}) as Partial<NameRecord>;
+  return { best: fixArray(r.best, 5, 0), bestTimeMs: fixArray(r.bestTimeMs, 5, 0) };
+}
+
+/**
+ * 난이도가 생기기 전(v2)의 기록은 `best`/`bestTimeMs`가 최상위에 있었다.
+ * 그건 전부 **보통**의 기록이다 — 그대로 `normal` 칸으로 옮긴다. 아무것도 잃지 않는다.
+ */
+function normalizeRecords(value: unknown): Record<string, NameRecords> {
+  const out: Record<string, NameRecords> = {};
   if (!value || typeof value !== "object") return out;
   for (const [name, rec] of Object.entries(value as Record<string, unknown>)) {
-    const r = rec as Partial<NameRecord>;
+    const r = (rec ?? {}) as Record<string, unknown>;
+    const legacy = Array.isArray(r.best) || Array.isArray(r.bestTimeMs);
     out[name] = {
-      best: fixArray(r?.best, 5, 0),
-      bestTimeMs: fixArray(r?.bestTimeMs, 5, 0),
+      lastDifficulty: isDifficulty(r.lastDifficulty) ? r.lastDifficulty : "normal",
+      easy: oneRecord(r.easy),
+      normal: legacy ? oneRecord(r) : oneRecord(r.normal),
+      hard: oneRecord(r.hard),
     };
   }
   return out;
 }
 
-/** 이름 하나의 기록 칸을 꺼내 온다 (없으면 빈 칸) */
-export function recordFor(data: SaveData, name: string): NameRecord {
-  return data.records[name] ?? { best: [0, 0, 0, 0, 0], bestTimeMs: [0, 0, 0, 0, 0] };
+/** 이름 하나의 난이도별 기록 묶음 */
+export function recordsFor(data: SaveData, name: string): NameRecords {
+  return data.records[name] ?? emptyNameRecords();
+}
+
+/** 이름 + 난이도 한 칸 */
+export function recordFor(data: SaveData, name: string, diff: Difficulty): NameRecord {
+  return recordsFor(data, name)[diff];
 }
 
 export function save(data: SaveData): void {
