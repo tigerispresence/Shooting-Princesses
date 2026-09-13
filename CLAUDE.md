@@ -6,6 +6,7 @@ Web games built for two 10-year-old girls. One directory per game, one git repo 
 
 | Directory | Status |
 |---|---|
+| `00.game_hub` | live at https://00gamehub.vercel.app; Next.js 16; 배포된 게임 링크 모음 허브. 새 게임 배포 후 `src/app/games.ts`에 카드 추가 |
 | `01.princess_maker` | empty — not started |
 | `02.princess-shooters` | live; Next.js 16; princesses riding fairytale mounts, wave shooter with 3-stage boss |
 | `_03.flash_maze` | live; Next.js 16; memorize a maze in 5 seconds, then escape in the dark |
