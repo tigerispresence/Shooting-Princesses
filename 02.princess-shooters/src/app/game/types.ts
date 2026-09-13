@@ -104,6 +104,8 @@ export interface EnemyProjectile {
   color: string;
 }
 
+export type Difficulty = "easy" | "normal" | "hard";
+
 export interface ScoreRecord {
   name: string;
   princess: string;
@@ -111,6 +113,7 @@ export interface ScoreRecord {
   stage: number;
   wave: number;
   date: string;
+  difficulty?: Difficulty;
 }
 
 export interface GameState {
@@ -145,4 +148,5 @@ export interface GameState {
   stageClearing: boolean;
   stageClearTimer: number;
   victory: boolean;
+  difficulty: Difficulty;
 }

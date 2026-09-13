@@ -9,6 +9,7 @@ import {
   EnemyType,
   Boss,
   EnemyProjectile,
+  Difficulty,
 } from "./types";
 import {
   PRINCESSES,
@@ -20,12 +21,18 @@ import {
   PLAYER_HEIGHT,
   PLAYER_SPEED,
   PROJECTILE_SPEED,
-  POWERUP_CHANCE,
+  DIFFICULTY_CONFIG,
+  DEFAULT_DIFFICULTY,
 } from "./constants";
 import { playSFX } from "./audio";
 
-export function createInitialState(): GameState {
+export function waveSize(wave: number, difficulty: Difficulty): number {
+  return Math.max(3, Math.round((5 + wave * 2) * DIFFICULTY_CONFIG[difficulty].waveSizeMult));
+}
+
+export function createInitialState(difficulty: Difficulty = DEFAULT_DIFFICULTY): GameState {
   const princess = PRINCESSES[Math.floor(Math.random() * PRINCESSES.length)];
+  const diff = DIFFICULTY_CONFIG[difficulty];
   return {
     player: {
       x: 100,
@@ -34,7 +41,7 @@ export function createInitialState(): GameState {
       height: PLAYER_HEIGHT,
       speed: PLAYER_SPEED,
       princess,
-      lives: 3,
+      lives: diff.lives,
       invincibleUntil: 0,
       shieldActive: false,
       shieldUntil: 0,
@@ -47,7 +54,7 @@ export function createInitialState(): GameState {
     powerUps: [],
     score: 0,
     wave: 1,
-    enemiesInWave: 5,
+    enemiesInWave: waveSize(1, difficulty),
     enemiesSpawned: 0,
     gameOver: false,
     paused: false,
@@ -70,6 +77,7 @@ export function createInitialState(): GameState {
     stageClearing: false,
     stageClearTimer: 0,
     victory: false,
+    difficulty,
   };
 }
 
@@ -128,7 +136,10 @@ export function shoot(state: GameState): Projectile[] {
 export function spawnEnemy(state: GameState): Enemy | null {
   if (state.waveTransition) return null;
 
-  const waveIndex = Math.min(state.wave - 1, WAVE_ENEMIES.length - 1);
+  const waveIndex = Math.max(
+    0,
+    Math.min(state.wave - 1 + DIFFICULTY_CONFIG[state.difficulty].enemyTierOffset, WAVE_ENEMIES.length - 1)
+  );
   const possibleTypes = WAVE_ENEMIES[waveIndex];
   const type = possibleTypes[Math.floor(Math.random() * possibleTypes.length)];
   const config = ENEMY_CONFIG[type];
@@ -138,7 +149,7 @@ export function spawnEnemy(state: GameState): Enemy | null {
     y: 50 + Math.random() * (CANVAS_HEIGHT - 100),
     width: config.size,
     height: config.size,
-    speed: config.speed + (state.wave - 1) * 0.2,
+    speed: (config.speed + (state.wave - 1) * 0.2) * DIFFICULTY_CONFIG[state.difficulty].enemySpeedMult,
     health: config.health,
     maxHealth: config.health,
     type,
@@ -168,8 +179,8 @@ export function createExplosionParticles(x: number, y: number, color: string): P
   return particles;
 }
 
-export function spawnPowerUp(x: number, y: number): PowerUp | null {
-  if (Math.random() > POWERUP_CHANCE) return null;
+export function spawnPowerUp(x: number, y: number, difficulty: Difficulty): PowerUp | null {
+  if (Math.random() > DIFFICULTY_CONFIG[difficulty].powerUpChance) return null;
   const types: PowerUp["type"][] = ["heart", "shield", "rapidFire", "tripleShot"];
   return {
     x,
@@ -204,7 +215,7 @@ export function activateSuper(state: GameState): Particle[] {
   }
 
   const deadCount = particles.length / 15;
-  state.score += Math.floor(deadCount) * 50 * state.wave;
+  state.score += Math.round(Math.floor(deadCount) * 50 * state.wave * DIFFICULTY_CONFIG[state.difficulty].scoreMult);
 
   for (let i = 0; i < 40; i++) {
     const angle = (Math.PI * 2 * i) / 40;
@@ -244,13 +255,14 @@ export function isBossWave(wave: number): boolean {
 export function spawnBoss(state: GameState): Boss {
   const stageIndex = state.stage - 1;
   const config = BOSS_CONFIG[Math.min(stageIndex, BOSS_CONFIG.length - 1)];
+  const health = Math.round(config.health * DIFFICULTY_CONFIG[state.difficulty].bossHealthMult);
   return {
     x: CANVAS_WIDTH + config.size,
     y: CANVAS_HEIGHT / 2,
     width: config.size,
     height: config.size,
-    health: config.health,
-    maxHealth: config.health,
+    health,
+    maxHealth: health,
     stageIndex,
     lastShot: 0,
     phase: 0,
@@ -264,6 +276,7 @@ function updateBoss(state: GameState, dt: number): void {
 
   const stageIndex = boss.stageIndex;
   const config = BOSS_CONFIG[Math.min(stageIndex, BOSS_CONFIG.length - 1)];
+  const diff = DIFFICULTY_CONFIG[state.difficulty];
 
   // Enter animation: slide in from right
   if (boss.enterAnim < 60) {
@@ -284,14 +297,14 @@ function updateBoss(state: GameState, dt: number): void {
 
   // Shoot projectiles at player
   const now = Date.now();
-  const interval = boss.phase === 1 ? config.shotInterval * 0.6 : config.shotInterval;
+  const interval = (boss.phase === 1 ? config.shotInterval * 0.6 : config.shotInterval) * diff.bossShotIntervalMult;
   if (now - boss.lastShot > interval) {
     boss.lastShot = now;
     const { player } = state;
     const dx = player.x - boss.x;
     const dy = player.y - boss.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const speed = 4 + stageIndex;
+    const speed = (4 + stageIndex) * diff.bossProjectileSpeedMult;
 
     state.enemyProjectiles.push({
       x: boss.x - boss.width / 3,
@@ -329,7 +342,7 @@ export function applyPowerUp(state: GameState, powerUp: PowerUp) {
   playSFX("powerUp");
   switch (powerUp.type) {
     case "heart":
-      state.player.lives = Math.min(state.player.lives + 1, 5);
+      state.player.lives = Math.min(state.player.lives + 1, DIFFICULTY_CONFIG[state.difficulty].maxLives);
       break;
     case "shield":
       state.player.shieldActive = true;
@@ -366,6 +379,7 @@ export function updateGameState(
 
   const { player } = state;
   const dt = deltaTime / 16;
+  const diff = DIFFICULTY_CONFIG[state.difficulty];
 
   // Player movement
   if (keys.has("ArrowUp") || keys.has("w")) {
@@ -460,15 +474,15 @@ export function updateGameState(
 
         if (enemy.health <= 0) {
           const config = ENEMY_CONFIG[enemy.type];
-          state.score += config.points * state.wave;
+          state.score += Math.round(config.points * state.wave * diff.scoreMult);
           newParticles.push(...createExplosionParticles(enemy.x, enemy.y, "#FFD700"));
           playSFX("enemyDefeat");
           state.superCharge++;
-          if (state.superCharge >= 10 && !state.superReady && !state.superActive) {
+          if (state.superCharge >= diff.superChargeNeeded && !state.superReady && !state.superActive) {
             state.superReady = true;
             playSFX("superReady");
           }
-          const pu = spawnPowerUp(enemy.x, enemy.y);
+          const pu = spawnPowerUp(enemy.x, enemy.y, state.difficulty);
           if (pu) newPowerUps.push(pu);
           state.enemies.splice(j, 1);
         }
@@ -488,11 +502,11 @@ export function updateGameState(
         if (player.shieldActive) {
           state.particles.push(...createExplosionParticles(enemy.x, enemy.y, "#00FFFF"));
           state.enemies.splice(i, 1);
-          state.score += 5;
+          state.score += Math.round(5 * diff.scoreMult);
           playSFX("enemyDefeat");
         } else {
           player.lives--;
-          player.invincibleUntil = Date.now() + 2000;
+          player.invincibleUntil = Date.now() + diff.invincibleMs;
           state.particles.push(...createExplosionParticles(player.x, player.y, "#FF6B6B"));
           state.enemies.splice(i, 1);
           playSFX("playerHit");
@@ -544,7 +558,7 @@ export function updateGameState(
           state.particles.push(...createExplosionParticles(ep.x, ep.y, "#00FFFF"));
         } else {
           player.lives--;
-          player.invincibleUntil = Date.now() + 2000;
+          player.invincibleUntil = Date.now() + diff.invincibleMs;
           state.particles.push(...createExplosionParticles(player.x, player.y, "#FF6B6B"));
           playSFX("playerHit");
           if (player.lives <= 0) {
@@ -572,7 +586,7 @@ export function updateGameState(
         playSFX("enemyHit");
 
         if (boss.health <= 0) {
-          state.score += 500 * state.stage;
+          state.score += Math.round(500 * state.stage * diff.scoreMult);
           state.particles.push(...createExplosionParticles(boss.x, boss.y, "#FFD700"));
           state.particles.push(...createExplosionParticles(boss.x - 30, boss.y - 20, "#FF69B4"));
           state.particles.push(...createExplosionParticles(boss.x + 30, boss.y + 20, "#9B59B6"));
@@ -609,7 +623,7 @@ export function updateGameState(
       } else {
         state.stage++;
         state.wave++;
-        state.enemiesInWave = 5 + state.wave * 2;
+        state.enemiesInWave = waveSize(state.wave, state.difficulty);
         state.enemiesSpawned = 0;
         state.waveTransition = true;
         state.waveTransitionTimer = 2000;
@@ -636,7 +650,7 @@ export function updateGameState(
       playSFX("waveComplete");
     } else {
       state.wave++;
-      state.enemiesInWave = 5 + state.wave * 2;
+      state.enemiesInWave = waveSize(state.wave, state.difficulty);
       state.enemiesSpawned = 0;
       state.waveTransition = true;
       state.waveTransitionTimer = 2000;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ScoreRecord } from "./types";
+import { DIFFICULTY_CONFIG } from "./constants";
 
 const STORAGE_KEY = "princessShooterScores";
 const MAX_SCORES = 10;
@@ -61,8 +62,15 @@ export default function Scoreboard({ onBack, highlightScore }: ScoreboardProps) 
               <div className="col-span-1">#</div>
               <div className="col-span-3">Name</div>
               <div className="col-span-2 text-right">Score</div>
-              <div className="col-span-2 text-center">Stage</div>
-              <div className="col-span-2 text-center">Princess</div>
+              <div className="col-span-1 text-center overflow-hidden">
+                <span className="hidden sm:inline">Mode</span>
+                <span className="sm:hidden">Md</span>
+              </div>
+              <div className="col-span-1 text-center overflow-hidden">
+                <span className="hidden sm:inline">Stage</span>
+                <span className="sm:hidden">St</span>
+              </div>
+              <div className="col-span-2 text-center overflow-hidden truncate">Princess</div>
               <div className="col-span-2 text-right">Date</div>
             </div>
 
@@ -89,7 +97,13 @@ export default function Scoreboard({ onBack, highlightScore }: ScoreboardProps) 
                   <div className="col-span-2 text-right text-yellow-300 font-bold">
                     {record.score.toLocaleString()}
                   </div>
-                  <div className="col-span-2 text-center text-purple-200">
+                  <div
+                    className="col-span-1 text-center"
+                    title={record.difficulty ? DIFFICULTY_CONFIG[record.difficulty].label : "Normal"}
+                  >
+                    {DIFFICULTY_CONFIG[record.difficulty ?? "normal"].emoji}
+                  </div>
+                  <div className="col-span-1 text-center text-purple-200">
                     {record.stage}-{record.wave}
                   </div>
                   <div className="col-span-2 text-center text-pink-300 truncate">

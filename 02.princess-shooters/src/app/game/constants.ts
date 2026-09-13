@@ -1,4 +1,4 @@
-import { Princess, EnemyType } from "./types";
+import { Princess, EnemyType, Difficulty } from "./types";
 
 export const PRINCESSES: Princess[] = [
   {
@@ -167,3 +167,90 @@ export const PLAYER_SPEED = 5;
 export const PROJECTILE_SPEED = 8;
 export const SPAWN_INTERVAL = 1500;
 export const POWERUP_CHANCE = 0.15;
+
+export interface DifficultyConfig {
+  label: string;
+  emoji: string;
+  color: string;
+  description: string;
+  lives: number;
+  maxLives: number;
+  enemySpeedMult: number;
+  spawnIntervalMult: number;
+  waveSizeMult: number;
+  bossHealthMult: number;
+  bossShotIntervalMult: number;
+  bossProjectileSpeedMult: number;
+  powerUpChance: number;
+  superChargeNeeded: number;
+  invincibleMs: number;
+  scoreMult: number;
+  enemyTierOffset: number;
+  shootCooldownMs: number;
+}
+
+export const DIFFICULTY_ORDER: Difficulty[] = ["easy", "normal", "hard"];
+export const DEFAULT_DIFFICULTY: Difficulty = "normal";
+
+export const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
+  easy: {
+    label: "Easy",
+    emoji: "🌸",
+    color: "#7FE3A0",
+    description: "Slow foes, lots of hearts — a gentle sky ride",
+    lives: 5,
+    maxLives: 6,
+    enemySpeedMult: 0.65,
+    spawnIntervalMult: 1.5,
+    waveSizeMult: 0.7,
+    bossHealthMult: 0.6,
+    bossShotIntervalMult: 1.8,
+    bossProjectileSpeedMult: 0.65,
+    powerUpChance: 0.3,
+    superChargeNeeded: 6,
+    invincibleMs: 3000,
+    scoreMult: 0.8,
+    enemyTierOffset: -1,
+    shootCooldownMs: 200,
+  },
+  normal: {
+    label: "Normal",
+    emoji: "⭐",
+    color: "#FFD700",
+    description: "The classic fairytale battle",
+    lives: 3,
+    maxLives: 5,
+    enemySpeedMult: 1,
+    spawnIntervalMult: 1,
+    waveSizeMult: 1,
+    bossHealthMult: 1,
+    bossShotIntervalMult: 1,
+    bossProjectileSpeedMult: 1,
+    powerUpChance: POWERUP_CHANCE,
+    superChargeNeeded: 10,
+    invincibleMs: 2000,
+    scoreMult: 1,
+    enemyTierOffset: 0,
+    shootCooldownMs: 250,
+  },
+  hard: {
+    label: "Hard",
+    emoji: "👑",
+    color: "#FF6B6B",
+    description: "Fast foes, fierce bosses — for true queens!",
+    lives: 3,
+    maxLives: 5,
+    enemySpeedMult: 1.3,
+    spawnIntervalMult: 0.85,
+    waveSizeMult: 1.2,
+    bossHealthMult: 1.2,
+    bossShotIntervalMult: 0.9,
+    bossProjectileSpeedMult: 1.15,
+    powerUpChance: 0.15,
+    superChargeNeeded: 12,
+    invincibleMs: 2000,
+    scoreMult: 1.3,
+    enemyTierOffset: 1,
+    shootCooldownMs: 250,
+  },
+};

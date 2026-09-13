@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PRINCESSES, PLAYER_SPEED } from "./constants";
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PRINCESSES, PLAYER_SPEED, DIFFICULTY_CONFIG, DEFAULT_DIFFICULTY } from "./constants";
 import { createInitialState, shoot, spawnEnemy, updateGameState, activateSuper } from "./engine";
+import { Difficulty } from "./types";
 import {
   drawBackground,
   drawPlayer,
@@ -60,11 +61,13 @@ export default function GameCanvas() {
   }, [screen]);
 
   const customNameRef = useRef("");
+  const difficultyRef = useRef<Difficulty>(DEFAULT_DIFFICULTY);
 
-  const startGame = useCallback((princessIndex: number, customName?: string) => {
+  const startGame = useCallback((princessIndex: number, customName?: string, difficulty?: Difficulty) => {
     selectedPrincessRef.current = princessIndex;
     if (customName !== undefined) customNameRef.current = customName;
-    const state = createInitialState();
+    if (difficulty !== undefined) difficultyRef.current = difficulty;
+    const state = createInitialState(difficultyRef.current);
     const princess = { ...PRINCESSES[princessIndex] };
     if (customNameRef.current) princess.name = customNameRef.current;
     state.player.princess = princess;
@@ -85,7 +88,7 @@ export default function GameCanvas() {
     if (!state.started || state.gameOver || state.paused) return;
 
     const now = Date.now();
-    const cooldown = state.rapidFireUntil > now ? 100 : 250;
+    const cooldown = state.rapidFireUntil > now ? 100 : DIFFICULTY_CONFIG[state.difficulty].shootCooldownMs;
     if (now - lastShotRef.current < cooldown) return;
     lastShotRef.current = now;
 
@@ -197,6 +200,7 @@ export default function GameCanvas() {
           score: state.score,
           stage: state.stage,
           wave: state.wave,
+          difficulty: state.difficulty,
         });
         setLastScore(state.score);
       }
@@ -211,7 +215,7 @@ export default function GameCanvas() {
 
       if (state.started && !state.gameOver && !state.waveTransition && !state.bossActive && !state.stageClearing) {
         const now = Date.now();
-        const spawnInterval = Math.max(600, 1500 - state.wave * 100);
+        const spawnInterval = Math.max(500, (1500 - state.wave * 100) * DIFFICULTY_CONFIG[state.difficulty].spawnIntervalMult);
         if (now - lastSpawnRef.current > spawnInterval && state.enemiesSpawned < state.enemiesInWave) {
           const enemy = spawnEnemy(state);
           if (enemy) {
@@ -288,7 +292,7 @@ export default function GameCanvas() {
 
   if (screen === "select") {
     return (
-      <div className="flex flex-col items-center justify-start sm:justify-center min-h-screen p-2 sm:p-4 overflow-y-auto">
+      <div className="flex flex-col items-center justify-start sm:justify-center min-h-screen p-2 sm:p-2 overflow-y-auto">
         <CharacterSelect onSelect={startGame} />
       </div>
     );

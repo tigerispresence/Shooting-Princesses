@@ -1,18 +1,37 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { PRINCESSES, PLAYER_WIDTH, PLAYER_HEIGHT } from "./constants";
+import { PRINCESSES, PLAYER_WIDTH, PLAYER_HEIGHT, DIFFICULTY_CONFIG, DIFFICULTY_ORDER, DEFAULT_DIFFICULTY } from "./constants";
 import { drawPrincessSprite } from "./sprites";
-import { Player } from "./types";
+import { Player, Difficulty } from "./types";
 import { initAudio } from "./audio";
 
+const DIFFICULTY_KEY = "princessShooterDifficulty";
+
+function loadDifficulty(): Difficulty {
+  if (typeof window === "undefined") return DEFAULT_DIFFICULTY;
+  const saved = localStorage.getItem(DIFFICULTY_KEY);
+  return DIFFICULTY_ORDER.includes(saved as Difficulty) ? (saved as Difficulty) : DEFAULT_DIFFICULTY;
+}
+
 interface CharacterSelectProps {
-  onSelect: (index: number, customName: string) => void;
+  onSelect: (index: number, customName: string, difficulty: Difficulty) => void;
 }
 
 export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
   const [selected, setSelected] = useState(0);
   const [customName, setCustomName] = useState("");
+  const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
+
+  useEffect(() => {
+    setDifficulty(loadDifficulty());
+  }, []);
+
+  const pickDifficulty = (d: Difficulty) => {
+    initAudio();
+    setDifficulty(d);
+    localStorage.setItem(DIFFICULTY_KEY, d);
+  };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
   const animRef = useRef<number>(0);
@@ -58,7 +77,7 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
       style={{ paddingBottom: "env(safe-area-inset-bottom, 16px)" }}
     >
       <h1
-        className="text-2xl sm:text-5xl font-bold mb-0.5 sm:mb-1 text-transparent bg-clip-text animate-pulse"
+        className="text-2xl sm:text-4xl font-bold mb-0.5 sm:mb-1 text-transparent bg-clip-text animate-pulse"
         style={{
           backgroundImage: "linear-gradient(90deg, #FF69B4, #FFD700, #9B59B6, #3498DB, #FF69B4)",
           backgroundSize: "200% 100%",
@@ -67,18 +86,18 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
       >
         Princess Shooters
       </h1>
-      <p className="text-sm sm:text-xl text-yellow-300 mb-2 sm:mb-6">Fairytale Sky Battle!</p>
+      <p className="text-sm sm:text-xl text-yellow-300 mb-2 sm:mb-3">Fairytale Sky Battle!</p>
 
       {/* Mobile: side-by-side preview + grid. Desktop: stacked */}
       <div className="flex flex-col sm:contents">
-        <div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-0 mb-3 sm:mb-6">
+        <div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-0 mb-3 sm:mb-3">
           {/* Selected character preview */}
-          <div className="flex flex-col items-center p-2 sm:p-4 rounded-2xl bg-purple-900/40 border-2 border-purple-400/30 shrink-0">
+          <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl bg-purple-900/40 border-2 border-purple-400/30 shrink-0">
             <canvas
               ref={canvasRef}
               width={200}
               height={200}
-              className="w-[100px] h-[100px] sm:w-[200px] sm:h-[200px] mb-1 sm:mb-2"
+              className="w-[100px] h-[100px] sm:w-[140px] sm:h-[140px] mb-1 sm:mb-1"
             />
             <h2 className="text-lg sm:text-3xl font-bold" style={{ color: princess.color }}>
               {displayName}
@@ -88,7 +107,7 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
               value={customName}
               onChange={(e) => setCustomName(e.target.value.slice(0, 16))}
               placeholder={princess.name}
-              className="mt-1 sm:mt-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-purple-800/50 border border-purple-400/40 text-center text-white text-xs sm:text-base placeholder-purple-400/50 focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50 w-32 sm:w-48"
+              className="mt-1 sm:mt-1 px-2 sm:px-3 py-1 sm:py-1 rounded-lg bg-purple-800/50 border border-purple-400/40 text-center text-white text-xs sm:text-base placeholder-purple-400/50 focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50 w-32 sm:w-48"
               maxLength={16}
             />
             <p className="text-purple-200 text-xs sm:text-base mt-1">
@@ -98,19 +117,19 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
           </div>
 
           {/* Character grid — compact on mobile */}
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-3 w-full max-w-lg sm:mt-6 sm:mb-6">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-3 w-full max-w-lg sm:mt-3 sm:mb-3">
             {PRINCESSES.map((p, i) => (
               <button
                 key={p.name}
                 onClick={() => { initAudio(); setSelected(i); }}
-                className={`flex flex-col items-center gap-0 sm:gap-1 p-1.5 sm:p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                className={`flex flex-col items-center gap-0 sm:gap-0.5 p-1.5 sm:p-2 rounded-xl border-2 transition-all cursor-pointer ${
                   selected === i
                     ? "border-yellow-400 bg-purple-800/60 scale-105 shadow-lg"
                     : "border-purple-600/30 bg-purple-900/20 hover:border-purple-400 hover:bg-purple-900/40"
                 }`}
                 style={selected === i ? { boxShadow: `0 0 20px ${p.color}40` } : {}}
               >
-                <span className="text-xl sm:text-3xl">{p.mountEmoji}</span>
+                <span className="text-xl sm:text-2xl">{p.mountEmoji}</span>
                 <span className="text-[10px] sm:text-sm font-bold truncate w-full text-center" style={{ color: p.color }}>
                   {p.name}
                 </span>
@@ -121,9 +140,39 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
         </div>
       </div>
 
+      {/* Difficulty picker */}
+      <div className="flex flex-col items-center mb-2 sm:mb-3 w-full max-w-lg">
+        <div className="flex gap-1.5 sm:gap-3 w-full">
+          {DIFFICULTY_ORDER.map((d) => {
+            const cfg = DIFFICULTY_CONFIG[d];
+            const active = difficulty === d;
+            return (
+              <button
+                key={d}
+                onClick={() => pickDifficulty(d)}
+                className={`flex-1 flex flex-col items-center py-1.5 sm:py-1.5 rounded-xl border-2 transition-all cursor-pointer ${
+                  active
+                    ? "bg-purple-800/60 scale-105 shadow-lg"
+                    : "border-purple-600/30 bg-purple-900/20 hover:border-purple-400 hover:bg-purple-900/40"
+                }`}
+                style={active ? { borderColor: cfg.color, boxShadow: `0 0 16px ${cfg.color}55` } : {}}
+              >
+                <span className="text-lg sm:text-xl">{cfg.emoji}</span>
+                <span className="text-xs sm:text-base font-bold" style={{ color: active ? cfg.color : "#B8A9E8" }}>
+                  {cfg.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] sm:text-sm mt-1 sm:mt-1 italic min-h-[1.25rem] sm:min-h-[1.5rem]" style={{ color: DIFFICULTY_CONFIG[difficulty].color }}>
+          {DIFFICULTY_CONFIG[difficulty].description}
+        </p>
+      </div>
+
       {/* Start button */}
       <button
-        onClick={() => { initAudio(); onSelect(selected, customName.trim()); }}
+        onClick={() => { initAudio(); onSelect(selected, customName.trim(), difficulty); }}
         className="px-8 sm:px-12 py-2.5 sm:py-4 text-base sm:text-xl font-bold rounded-full border-2 border-yellow-400 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
       >
         Start Adventure!

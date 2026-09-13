@@ -9,7 +9,7 @@ import {
   Boss,
   EnemyProjectile,
 } from "./types";
-import { ENEMY_CONFIG, CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
+import { ENEMY_CONFIG, CANVAS_WIDTH, CANVAS_HEIGHT, DIFFICULTY_CONFIG } from "./constants";
 import { drawPrincessSprite, drawEnemySprite, drawPrincessPortrait, drawBossSprite } from "./sprites";
 import { STORY } from "./story";
 
@@ -202,6 +202,8 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.textAlign = "center";
   ctx.fillText(`Stage ${state.stage} — Wave ${state.wave}`, CANVAS_WIDTH / 2, 22);
 
+  const diff = DIFFICULTY_CONFIG[state.difficulty];
+
   ctx.fillStyle = state.player.princess.color;
   ctx.font = "bold 14px Arial";
   ctx.textAlign = "right";
@@ -211,6 +213,11 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.font = "12px Arial";
   ctx.textAlign = "right";
   ctx.fillText(`Best: ${state.highScore}`, CANVAS_WIDTH - 15, 32);
+
+  ctx.fillStyle = diff.color;
+  ctx.font = "bold 12px Arial";
+  ctx.textAlign = "right";
+  ctx.fillText(`${diff.emoji} ${diff.label}`, CANVAS_WIDTH - 110, 32);
 
   if (state.rapidFireUntil > Date.now()) {
     ctx.fillStyle = "#FFD700";
@@ -230,7 +237,8 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
   const meterY = CANVAS_HEIGHT - 22;
   const meterW = 120;
   const meterH = 10;
-  const charge = Math.min(state.superCharge, 10);
+  const chargeNeeded = diff.superChargeNeeded;
+  const charge = Math.min(state.superCharge, chargeNeeded);
 
   ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
   ctx.fillRect(meterX - 1, meterY - 1, meterW + 2, meterH + 2);
@@ -254,7 +262,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.textBaseline = "middle";
     ctx.fillText("SUPER ACTIVE!", CANVAS_WIDTH / 2, meterY + meterH / 2);
   } else {
-    const pct = charge / 10;
+    const pct = charge / chargeNeeded;
     const grad = ctx.createLinearGradient(meterX, 0, meterX + meterW * pct, 0);
     grad.addColorStop(0, state.player.princess.color);
     grad.addColorStop(1, state.player.princess.sparkleColor);
@@ -264,7 +272,7 @@ export function drawHUD(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.fillStyle = "#CCCCCC";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${charge}/10`, CANVAS_WIDTH / 2, meterY + meterH / 2);
+    ctx.fillText(`${charge}/${chargeNeeded}`, CANVAS_WIDTH / 2, meterY + meterH / 2);
   }
 }
 
@@ -309,9 +317,10 @@ export function drawGameOver(ctx: CanvasRenderingContext2D, state: GameState, fr
   ctx.fillStyle = "#FFD700";
   ctx.fillText(`Score: ${state.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
 
+  const diff = DIFFICULTY_CONFIG[state.difficulty];
   ctx.font = "16px Arial";
   ctx.fillStyle = "#B8A9E8";
-  ctx.fillText(`Stage ${state.stage} — Wave ${state.wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 15);
+  ctx.fillText(`Stage ${state.stage} — Wave ${state.wave}  ·  ${diff.emoji} ${diff.label}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 15);
 
   if (state.score >= state.highScore && state.score > 0) {
     ctx.font = "bold 22px Arial";
