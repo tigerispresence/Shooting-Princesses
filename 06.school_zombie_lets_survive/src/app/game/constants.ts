@@ -72,6 +72,10 @@ export const DARK_EYE_GLOW_R = 26;
 
 export const HIDE_ENTER_MS = 250;
 export const HIDE_RECD_MS = 1200;
+/** 숨은 채로 한 방향을 이만큼 밀고 있으면 손 버튼 없이 그쪽으로 나간다 */
+export const HIDE_AIM_EXIT_MS = 450;
+/** 사물함 중심에서 나가는 자리까지의 거리 (1차 시도, 2차 시도) */
+export const HIDE_EXIT_DIST = [TILE * 0.95, TILE * 1.35];
 export const ZOMBIE_WAIT_MS = 3500;
 
 export const FRIEND_FOLLOW_DIST = 32;

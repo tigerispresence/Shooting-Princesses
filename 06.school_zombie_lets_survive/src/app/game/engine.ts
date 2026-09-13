@@ -14,7 +14,9 @@ import {
   FRIEND_STALL_MS,
   FRIEND_WAKE_MS,
   GAMEOVER_MS,
+  HIDE_AIM_EXIT_MS,
   HIDE_ENTER_MS,
+  HIDE_EXIT_DIST,
   HIDE_RECD_MS,
   HUNGRY,
   INTERACT_DIST,
@@ -388,6 +390,9 @@ export function createGame(opts: CreateOpts): GameState {
     hideT: 0,
     hideDir: 1,
     hideFrom: { x: 0, y: 0 },
+    hideAim: null,
+    hideAimT: 0,
+    hideExits: 0,
     torchOn: false,
     alarms: stage.startAlarms,
     chalkCd: 0,
@@ -983,9 +988,14 @@ function updatePlayer(s: GameState, dt: number, dtMs: number): void {
       p.hideT = 0;
       if (p.hideDir === -1) {
         p.hiding = -1;
-        // 들어가기 전 자리로 돌려놓는다 — 사물함 칸은 통과 불가라 그 안에 두면 갇힌다
-        p.x = p.hideFrom.x;
-        p.y = p.hideFrom.y;
+        // 고른 방향이 있으면 그쪽 빈 자리로, 없으면 들어오기 전 자리로.
+        // 사물함 칸은 통과 불가라 그 안에 두면 갇힌다
+        const out = lockerExitSpot(s, p);
+        p.x = out.x;
+        p.y = out.y;
+        if (p.hideAim) p.face = Math.atan2(p.hideAim.y, p.hideAim.x);
+        p.hideAim = null;
+        p.hideAimT = 0;
         unstick(s, p, PLAYER_R, false);
       }
     }
@@ -993,6 +1003,7 @@ function updatePlayer(s: GameState, dt: number, dtMs: number): void {
   }
   if (p.hiding >= 0) {
     setMuffled(true);
+    updateHideAim(s, p, dtMs);
     return;
   }
   setMuffled(false);
@@ -1098,6 +1109,95 @@ function updateSection(s: GameState): void {
   }
 }
 
+// --- 사물함에서 나갈 방향 고르기 -------------------------------------------
+
+/** 숨어 있는 사물함의 중심. 들어갈 때 p.x = 칸 중심, p.y = 중심 + TILE*0.45 로 놓았다 */
+function lockerCenter(p: GameState["player"]): Vec {
+  return { x: p.x, y: p.y - TILE * 0.45 };
+}
+
+/** 입력 벡터를 8방향 단위 벡터로 맞춘다 */
+function snap8(x: number, y: number): Vec {
+  const a = Math.round(Math.atan2(y, x) / (Math.PI / 4)) * (Math.PI / 4);
+  // 1e-16 같은 부동소수 찌꺼기를 없애서 방향 비교가 깔끔하게 되게
+  return { x: Math.round(Math.cos(a) * 1000) / 1000, y: Math.round(Math.sin(a) * 1000) / 1000 };
+}
+
+/** 그 방향으로 나갔을 때 설 수 있는 자리. 못 서면 null */
+function exitSpotToward(s: GameState, c: Vec, dir: Vec): Vec | null {
+  for (const d of HIDE_EXIT_DIST) {
+    const x = c.x + dir.x * d;
+    const y = c.y + dir.y * d;
+    if (!circleHits(s, x, y, PLAYER_R, false)) return { x, y };
+  }
+  return null;
+}
+
+/** 사방 중 나갈 수 있는 쪽을 비트로. 화살표 힌트를 그릴 때 쓴다 */
+function lockerExitMask(s: GameState, c: Vec): number {
+  const dirs = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 0, y: -1 },
+  ];
+  let m = 0;
+  for (let i = 0; i < 4; i++) if (exitSpotToward(s, c, dirs[i])) m |= 1 << i;
+  return m;
+}
+
+function lockerExitSpot(s: GameState, p: GameState["player"]): Vec {
+  if (p.hideAim) {
+    const spot = exitSpotToward(s, lockerCenter(p), p.hideAim);
+    if (spot) return spot;
+  }
+  return { x: p.hideFrom.x, y: p.hideFrom.y };
+}
+
+function leaveLocker(s: GameState, p: GameState["player"]): void {
+  p.hideDir = -1;
+  p.hideT = HIDE_ENTER_MS;
+  playSfx("lockerOut");
+  p.lockerCd.set(p.hiding, HIDE_RECD_MS);
+}
+
+/**
+ * 숨은 채로 방향을 밀면 화살표가 그쪽을 가리키고, 계속 밀고 있으면 손 버튼 없이도 나간다.
+ * 살짝 건드린 정도(조이스틱 흔들림)로는 안 나간다.
+ */
+function updateHideAim(s: GameState, p: GameState["player"], dtMs: number): void {
+  if (p.hideT > 0) return;
+  const mag = Math.hypot(s.inx, s.iny);
+  if (mag < 0.45) {
+    p.hideAimT = 0;
+    return;
+  }
+  const dir = snap8(s.inx, s.iny);
+  const same = p.hideAim && Math.abs(p.hideAim.x - dir.x) < 1e-6 && Math.abs(p.hideAim.y - dir.y) < 1e-6;
+  if (!same) {
+    p.hideAim = dir;
+    p.hideAimT = 0;
+    return;
+  }
+  // 막힌 쪽으로는 아무리 밀어도 안 나간다 — 화살표만 흐리게 보인다
+  if (!exitSpotToward(s, lockerCenter(p), dir)) {
+    p.hideAimT = 0;
+    return;
+  }
+  p.hideAimT += dtMs;
+  if (p.hideAimT >= HIDE_AIM_EXIT_MS) {
+    p.hideAimT = 0;
+    leaveLocker(s, p);
+  }
+}
+
+/** 렌더러용 — 고른 방향으로 실제로 나갈 수 있는지 */
+export function hideAimOpen(s: GameState): boolean {
+  const p = s.player;
+  if (p.hiding < 0 || !p.hideAim) return false;
+  return exitSpotToward(s, lockerCenter(p), p.hideAim) !== null;
+}
+
 // --- 상호작용 ---------------------------------------------------------------
 
 function updateInteraction(s: GameState, dtMs: number): void {
@@ -1105,12 +1205,7 @@ function updateInteraction(s: GameState, dtMs: number): void {
   s.target = findTarget(s);
 
   if (p.hiding >= 0) {
-    if (s.pressed && p.hideT <= 0) {
-      p.hideDir = -1;
-      p.hideT = HIDE_ENTER_MS;
-      playSfx("lockerOut");
-      p.lockerCd.set(p.hiding, HIDE_RECD_MS);
-    }
+    if (s.pressed && p.hideT <= 0) leaveLocker(s, p);
     return;
   }
 
@@ -1190,6 +1285,9 @@ function updateInteraction(s: GameState, dtMs: number): void {
       p.hideFrom = { x: p.x, y: p.y };
       p.x = t.x;
       p.y = t.y + TILE * 0.45;
+      p.hideAim = null;
+      p.hideAimT = 0;
+      p.hideExits = lockerExitMask(s, { x: t.x, y: t.y });
       playSfx("lockerIn");
       hint(s, "locker");
       // 들어가는 걸 본 좀비는 사물함 앞에서 한참 하품한다

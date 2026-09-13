@@ -21,7 +21,8 @@ import {
   VIEW_W,
 } from "./constants";
 import { INGREDIENTS, tileAt } from "./maps";
-import { hasLineOfSight } from "./engine";
+import { HIDE_AIM_EXIT_MS } from "./constants";
+import { hasLineOfSight, hideAimOpen } from "./engine";
 import {
   drawAlarmOnGround,
   drawBeakerTile,
@@ -454,6 +455,7 @@ function drawWorld(
     ctx.arc(s.player.x + 5, s.player.y - 8, 2.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+    drawHideExitArrows(ctx, s);
   }
 
   // 파티클
@@ -1118,4 +1120,70 @@ export function drawStars(
     const size = 22 * (0.6 + appear * 0.4);
     drawStar(ctx, w / 2 + (i - 1) * 58, h / 2, size, i < stars && appear > 0.2);
   }
+}
+
+/**
+ * 숨어 있을 때 나갈 수 있는 쪽에 흐린 화살표, 고른 쪽에 큰 화살표.
+ * 방향을 계속 밀면 큰 화살표가 차오르고, 다 차면 그쪽으로 나간다.
+ */
+const EXIT_DIRS = [
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 },
+  { x: 0, y: -1 },
+];
+
+function arrowPath(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, size: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.35, -size * 0.75);
+  ctx.lineTo(-size * 0.05, 0);
+  ctx.lineTo(-size * 0.35, size * 0.75);
+  ctx.closePath();
+  ctx.restore();
+}
+
+function drawHideExitArrows(ctx: CanvasRenderingContext2D, s: GameState): void {
+  const p = s.player;
+  const cx = p.x;
+  const cy = p.y - TILE * 0.45;
+  const pulse = 0.75 + 0.25 * Math.sin(s.time * 0.006);
+  ctx.save();
+  ctx.lineJoin = "round";
+  // 흐린 힌트 — 나갈 수 있는 사방
+  for (let i = 0; i < 4; i++) {
+    if (!(p.hideExits & (1 << i))) continue;
+    const d = EXIT_DIRS[i];
+    const chosen = p.hideAim && Math.abs(p.hideAim.x - d.x) < 1e-6 && Math.abs(p.hideAim.y - d.y) < 1e-6;
+    if (chosen) continue;
+    arrowPath(ctx, cx + d.x * TILE * 0.72, cy + d.y * TILE * 0.72, Math.atan2(d.y, d.x), 7);
+    ctx.fillStyle = `rgba(255,255,255,${0.6 * pulse})`;
+    ctx.fill();
+  }
+  // 고른 방향 — 크고 밝게. 막힌 쪽이면 흐리고 빨갛게
+  if (p.hideAim) {
+    const open = hideAimOpen(s);
+    const ang = Math.atan2(p.hideAim.y, p.hideAim.x);
+    const ax = cx + p.hideAim.x * TILE * 0.8;
+    const ay = cy + p.hideAim.y * TILE * 0.8;
+    arrowPath(ctx, ax, ay, ang, 12);
+    ctx.fillStyle = open ? "#FFF4B0" : "rgba(255,120,120,0.55)";
+    ctx.strokeStyle = "#2A2440";
+    ctx.lineWidth = 2.5;
+    ctx.fill();
+    ctx.stroke();
+    // 차오르는 링 — 손 버튼 없이 나가기까지 남은 시간
+    if (open && p.hideAimT > 0) {
+      const f = Math.min(1, p.hideAimT / HIDE_AIM_EXIT_MS);
+      ctx.beginPath();
+      ctx.arc(ax, ay, 17, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2);
+      ctx.strokeStyle = "#FFF4B0";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }

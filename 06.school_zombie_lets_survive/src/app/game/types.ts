@@ -178,8 +178,14 @@ export interface Player {
   /** 문을 여닫는 중 (0~1) */
   hideT: number;
   hideDir: 1 | -1;
-  /** 사물함에 들어가기 직전 자리 — 나올 때 여기로 돌려놓는다 */
+  /** 사물함에 들어가기 직전 자리 — 방향을 안 고르면 여기로 돌려놓는다 */
   hideFrom: Vec;
+  /** 숨어 있는 동안 고른 나갈 방향 (단위 벡터, 8방향). 없으면 null */
+  hideAim: Vec | null;
+  /** 같은 방향을 계속 밀고 있는 시간 — 차면 손 버튼 없이도 그쪽으로 나간다 */
+  hideAimT: number;
+  /** 사물함 사방 중 나갈 수 있는 쪽 (bit 0 오른쪽, 1 아래, 2 왼쪽, 3 위) */
+  hideExits: number;
   torchOn: boolean;
   alarms: number;
   chalkCd: number;
