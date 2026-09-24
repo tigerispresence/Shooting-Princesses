@@ -2,6 +2,8 @@
 
 import { drawSoundIcon } from "./sprites";
 import SpriteCanvas from "./SpriteCanvas";
+import GoalList from "./GoalList";
+import type { GoalView } from "./types";
 
 /**
  * 일시정지 — 음악/효과음을 따로 끈다.
@@ -16,6 +18,7 @@ interface Props {
   onRestart: () => void;
   onExit: () => void;
   sectionLabel: string;
+  goals: GoalView[];
 }
 
 export default function PauseMenu({
@@ -27,6 +30,7 @@ export default function PauseMenu({
   onRestart,
   onExit,
   sectionLabel,
+  goals,
 }: Props) {
   const toggle = (label: string, on: boolean, set: (v: boolean) => void) => (
     <button
@@ -55,7 +59,10 @@ export default function PauseMenu({
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#151129]/88 p-6 text-center">
       <h2 className="text-2xl font-extrabold text-amber-200">잠깐 쉬는 중</h2>
       <p className="text-sm text-violet-200/80">{sectionLabel}</p>
-      <div className="mt-2 flex w-full max-w-[300px] flex-col gap-2">
+      <div className="w-full max-w-[300px]">
+        <GoalList goals={goals} />
+      </div>
+      <div className="mt-1 flex w-full max-w-[300px] flex-col gap-2">
         {toggle("음악", bgmOn, onBgm)}
         {toggle("효과음", sfxOn, onSfx)}
       </div>

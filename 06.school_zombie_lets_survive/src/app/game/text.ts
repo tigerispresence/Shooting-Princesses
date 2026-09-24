@@ -20,6 +20,11 @@ export const MECHANIC_HINTS: Record<string, string> = {
   locker: "들킬 것 같으면 사물함에 숨어!",
   chalk: "분필을 던지면 딴 데를 쳐다봐!",
   alarm: "알람시계는 다 끌어모아. 그 틈에 도망쳐!",
+  popper: "펑! 폭죽 터지면 좀비가 도망가!",
+  banana: "바나나 껍질 밟으면 철푸덕! 길목에 놔 봐.",
+  bossSlip: "교장 선생님도 바나나엔 못 이겨!",
+  popperGet: "폭죽 주웠다! 던지면 좀비가 도망가!",
+  bananaGet: "바나나 껍질 주웠다! 좀비 지나갈 길에 놔!",
   door: "문 잠그면 잠깐 못 따라와. 세 번뿐이야!",
   torch: "손전등 켜면 잘 보여. 근데... 더 잘 들켜!",
   friend: "친구를 구하면 짐을 하나 대신 들어줘!",
@@ -30,6 +35,16 @@ export const MECHANIC_HINTS: Record<string, string> = {
   dark: "깜깜해도 괜찮아, 손전등 있잖아!",
   vent: "비밀 통로다! 꾹 눌러서 들어가 봐.",
 };
+
+/** 오늘의 할 일 — 별 하나에 목표 하나 (DESIGN §16) */
+export const GOAL_TITLE = "오늘의 할 일";
+export const GOAL_MAIN = "재료 2개 모아서 출구로";
+export const GOAL_MAIN_5 = "해독제 만들고 방송 켜기";
+export const GOAL_MENU = "급식표 조각 2개 찾기";
+export const GOAL_DONE = "목표 달성!";
+export const GOAL_NEXT = "다음엔";
+export const GOAL_ALL = "별 3개 다 모았어!";
+export const GOAL_TAP = "눌러서 시작";
 
 /** 쫓기는 중에는 환풍구에 못 들어간다 (DESIGN §13-1) */
 export const VENT_DENY = "지금은 안 돼!";

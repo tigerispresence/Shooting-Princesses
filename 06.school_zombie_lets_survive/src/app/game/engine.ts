@@ -1,5 +1,7 @@
 import {
   ALARM,
+  BANANA,
+  POPPER,
   BOSS,
   COLORS,
   BOSS_R,
@@ -46,11 +48,22 @@ import {
   playYawn,
   setMuffled,
 } from "./audio";
-import { MECHANIC_HINTS, BOSS_COUGH, BOSS_INTRO, BOSS_SPEECH, randomSleepLine } from "./text";
+import {
+  MECHANIC_HINTS,
+  BOSS_COUGH,
+  BOSS_INTRO,
+  BOSS_SPEECH,
+  GOAL_DONE,
+  GOAL_MAIN,
+  GOAL_MAIN_5,
+  GOAL_MENU,
+  randomSleepLine,
+} from "./text";
 import type {
   Boss,
   Friend,
   GameState,
+  GoalView,
   HudState,
   InteractTarget,
   ItemEnt,
@@ -395,6 +408,8 @@ export function createGame(opts: CreateOpts): GameState {
     hideExits: 0,
     torchOn: false,
     alarms: tune.startAlarms,
+    poppers: tune.startPoppers,
+    bananas: tune.startBananas,
     chalkCd: 0,
     lockerCd: new Map(),
   };
@@ -412,6 +427,8 @@ export function createGame(opts: CreateOpts): GameState {
     items: [],
     chalks: [],
     alarms: [],
+    poppers: [],
+    bananas: [],
     doors: [],
     boss: null,
     particles: [],
@@ -440,6 +457,8 @@ export function createGame(opts: CreateOpts): GameState {
     radioT: 0,
     card: null,
     cardT: 0,
+    challenge: 0,
+    challengeDone: false,
     target: null,
     vents: [],
     ventT: 0,
@@ -537,12 +556,14 @@ export function createGame(opts: CreateOpts): GameState {
           y: c.y,
           phase: "walk",
           t: 0,
+          passArmed: false,
           radius: 0,
           line: BOSS_SPEECH[0],
           lineIndex: 0,
           active: false,
           bob: 0,
           home: { x: c.x, y: c.y },
+          slipT: 0,
         };
       } else if (ch === "F") {
         s.friends.push({
@@ -572,6 +593,10 @@ export function createGame(opts: CreateOpts): GameState {
         });
       } else if (ch === "K") {
         s.items.push({ kind: "alarm", index: 0, x: c.x, y: c.y, taken: false, ph: 0 });
+      } else if (ch === "B") {
+        s.items.push({ kind: "popper", index: 0, x: c.x, y: c.y, taken: false, ph: 0 });
+      } else if (ch === "W") {
+        s.items.push({ kind: "banana", index: 0, x: c.x, y: c.y, taken: false, ph: 0 });
       } else if (ch === stage.ingredientChars[0]) {
         s.items.push({
           kind: "ingredient",
@@ -706,6 +731,8 @@ function makeZombie(s: GameState, kind: "basic" | "hungry", at: Vec, seed: numbe
     variant: kind === "basic" ? ((Math.floor(rnd() * 3) % 3) as 0 | 1 | 2) : 0,
     phase: kind === "basic" ? rnd() * Math.PI * 2 : 0,
     bobAmp: kind === "basic" ? 0.85 + rnd() * 0.3 : 1,
+    daze: "none",
+    slipDir: 1,
   };
 }
 
@@ -852,6 +879,39 @@ export function placeAlarm(s: GameState): void {
   hint(s, "alarm");
 }
 
+/** 파티 폭죽 — 분필과 같은 방향·속도로 날아가 착지 지점에서 터진다 */
+export function throwPopper(s: GameState): void {
+  if (s.phase !== "playing" || s.paused) return;
+  if (s.stageId < 4) return;
+  if (s.player.hiding >= 0) return;
+  if (s.player.poppers <= 0) return;
+  s.player.poppers--;
+  const a = s.aim ?? s.player.face;
+  s.poppers.push({
+    x: s.player.x,
+    y: s.player.y,
+    vx: Math.cos(a) * POPPER.speed,
+    vy: Math.sin(a) * POPPER.speed,
+    traveled: 0,
+    landed: false,
+    t: 0,
+    spin: 0,
+  });
+  playSfx("chalkThrow");
+}
+
+/** 바나나 껍질 — 발밑에 놓는다. 좀비(와 교장 선생님)가 밟으면 미끄러진다 */
+export function placeBanana(s: GameState): void {
+  if (s.phase !== "playing" || s.paused) return;
+  if (s.stageId < 3) return;
+  if (s.player.hiding >= 0) return;
+  if (s.player.bananas <= 0) return;
+  s.player.bananas--;
+  s.bananas.push({ x: s.player.x, y: s.player.y, t: 0 });
+  playSfx("bananaSet");
+  hint(s, "banana");
+}
+
 export function toggleTorch(s: GameState): void {
   if (s.phase !== "playing" || s.paused) return;
   if (s.stageId < 3) return;
@@ -922,6 +982,8 @@ export function update(s: GameState, dtMs: number): void {
     updateDoors(s, dtMs);
     updateChalks(s, dt, dtMs);
     updateAlarms(s, dtMs);
+    updatePoppers(s, dt, dtMs);
+    updateBananas(s, dtMs);
     updateZombies(s, dt, dtMs);
     updateFriends(s, dt, dtMs);
     updateBoss(s, dt, dtMs);
@@ -969,6 +1031,8 @@ export function update(s: GameState, dtMs: number): void {
   updateDoors(s, dtMs);
   updateChalks(s, dt, dtMs);
   updateAlarms(s, dtMs);
+  updatePoppers(s, dt, dtMs);
+  updateBananas(s, dtMs);
   updateZombies(s, dt, dtMs);
   updateFriends(s, dt, dtMs);
   updateBoss(s, dt, dtMs);
@@ -1308,6 +1372,7 @@ function updateInteraction(s: GameState, dtMs: number): void {
       p.hideExits = lockerExitMask(s, { x: t.x, y: t.y });
       playSfx("lockerIn");
       hint(s, "locker");
+      if (s.stageId === 1) bumpChallenge(s, 1);
       // 들어가는 걸 본 좀비는 사물함 앞에서 한참 하품한다
       for (const z of s.zombies) {
         if (z.state === "chase" || z.state === "notice") {
@@ -1489,10 +1554,20 @@ function takeItem(s: GameState, it: ItemEnt): void {
     spawnSparks(s, it.x, it.y, "#FFF3C4", 10);
     playSfx("paper");
     hint(s, "menu");
-  } else {
+  } else if (it.kind === "alarm") {
     s.player.alarms = Math.min(s.tune.alarmMax, s.player.alarms + 1);
     playSfx("alarmSet");
     spawnSparks(s, it.x, it.y, "#FFC93C", 8);
+  } else if (it.kind === "popper") {
+    s.player.poppers = Math.min(s.tune.popperMax, s.player.poppers + 1);
+    playSfx("alarmSet");
+    spawnConfetti(s, it.x, it.y, 10);
+    hint(s, "popperGet");
+  } else {
+    s.player.bananas = Math.min(s.tune.bananaMax, s.player.bananas + 1);
+    playSfx("alarmSet");
+    spawnSparks(s, it.x, it.y, "#FFE45C", 8);
+    hint(s, "bananaGet");
   }
 }
 
@@ -1530,7 +1605,8 @@ function updateChalks(s: GameState, dt: number, dtMs: number): void {
         c.landed = true;
         c.t = 0;
         playSfx("chalkLand");
-        makeNoise(s, c.x, c.y, CHALK.noiseR, CHALK.distractMs, false);
+        const turned = makeNoise(s, c.x, c.y, CHALK.noiseR, CHALK.distractMs, false);
+        if (s.stageId === 2 && turned > 0) bumpChallenge(s, 1);
       } else {
         c.x = nx;
         c.y = ny;
@@ -1555,9 +1631,131 @@ function updateAlarms(s: GameState, dtMs: number): void {
       if (Math.floor((ringT - dtMs) / 500) !== Math.floor(ringT / 500)) playAlarmRing();
       // 울리는 내내 붙잡아 둔다
       makeNoise(s, a.x, a.y, ALARM.noiseR, 400, true);
+      if (s.stageId === 3 && !s.challengeDone) {
+        const gathered = s.zombies.filter((z) => dist(z.x, z.y, a.x, a.y) < 44).length;
+        if (gathered >= 2) bumpChallenge(s, 1);
+      }
       if (ringT >= ALARM.ringMs) s.alarms.splice(i, 1);
     }
   }
+}
+
+function updatePoppers(s: GameState, dt: number, dtMs: number): void {
+  for (let i = s.poppers.length - 1; i >= 0; i--) {
+    const c = s.poppers[i];
+    if (!c.landed) {
+      const nx = c.x + c.vx * dt;
+      const ny = c.y + c.vy * dt;
+      c.traveled += Math.hypot(nx - c.x, ny - c.y);
+      c.spin += dt * 10;
+      if (blocksMove(s, tileOf(nx), tileOf(ny), false) || c.traveled >= POPPER.range) {
+        c.landed = true;
+        c.t = 0;
+        playSfx("popper");
+        s.shake = Math.max(s.shake, 120);
+        spawnConfetti(s, c.x, c.y, 28);
+        scareZombies(s, c.x, c.y, POPPER.scareR);
+        hint(s, "popper");
+      } else {
+        c.x = nx;
+        c.y = ny;
+      }
+    } else {
+      c.t += dtMs;
+      if (c.t > 900) s.poppers.splice(i, 1);
+    }
+  }
+}
+
+/** 반경 안 좀비가 터진 곳 반대쪽으로 도망친다. 추격 중이던 좀비도 놓친다 */
+function scareZombies(s: GameState, x: number, y: number, radius: number): number {
+  let scared = 0;
+  for (const z of s.zombies) {
+    if (z.dormant) continue;
+    const d = dist(z.x, z.y, x, y);
+    if (d > radius) continue;
+    scared++;
+    const dx = z.x - x;
+    const dy = z.y - y;
+    const len = Math.hypot(dx, dy) || 1;
+    z.state = "flee";
+    z.t = POPPER.fleeMs;
+    z.stallT = 0;
+    z.daze = "none";
+    z.goal = { x: z.x + (dx / len) * POPPER.fleeDist, y: z.y + (dy / len) * POPPER.fleeDist };
+    z.route = [];
+    z.routeAt = 0;
+    z.repathT = 0;
+    z.nearArmed = false;
+    z.pauseT = 0;
+    s.floaters.push({ x: z.x, y: z.y - z.r - 14, text: "으악!", color: "#FFFFFF", life: 800 });
+  }
+  return scared;
+}
+
+function updateBananas(s: GameState, dtMs: number): void {
+  for (let i = s.bananas.length - 1; i >= 0; i--) {
+    const b = s.bananas[i];
+    b.t += dtMs;
+    if (b.t < BANANA.armMs) continue;
+    let used = false;
+    for (const z of s.zombies) {
+      if (z.dormant) continue;
+      if (z.stallT > 0 && z.daze === "slip") continue;
+      if (dist(z.x, z.y, b.x, b.y) > BANANA.stepR) continue;
+      // 「슈욱— 철푸덕!」 — 그 자리에 누워서 별이 뱅뱅 돈다. 쫓아오던 중이어도 끝.
+      z.state = "patrol";
+      z.goal = null;
+      z.route = [];
+      z.stallT = BANANA.slipMs;
+      z.daze = "slip";
+      z.slipDir = z.x >= b.x ? 1 : -1;
+      z.pauseT = 0;
+      z.nearArmed = false;
+      resnapPatrol(z);
+      used = true;
+      break;
+    }
+    const boss = s.boss;
+    if (
+      !used &&
+      boss &&
+      boss.active &&
+      boss.slipT <= 0 &&
+      boss.phase !== "speech" &&
+      dist(boss.x, boss.y, b.x, b.y) <= BANANA.stepR + 6
+    ) {
+      // 교장 선생님도 바나나엔 못 이긴다 — 연설 준비가 끊기고 누워 있다가 헛기침(회복)으로 이어진다
+      boss.phase = "recover";
+      boss.t = -BANANA.bossSlipMs;
+      boss.slipT = BANANA.bossSlipMs;
+      boss.radius = 0;
+      boss.passArmed = false;
+      setRadio(s, MECHANIC_HINTS.bossSlip);
+      used = true;
+    }
+    if (used) {
+      playSfx("slip");
+      s.shake = Math.max(s.shake, 90);
+      spawnSparks(s, b.x, b.y, "#FFE45C", 10);
+      s.floaters.push({ x: b.x, y: b.y - 26, text: "철푸덕!", color: "#FFE45C", life: 1000 });
+      s.bananas.splice(i, 1);
+    }
+  }
+}
+
+/** 멈춰 있던 자리에서 가장 가까운 순찰 지점부터 다시 돈다 */
+function resnapPatrol(z: Zombie): void {
+  let bestI = 0;
+  let bestD = Infinity;
+  z.path.forEach((pt, i) => {
+    const dd = dist(pt.x, pt.y, z.x, z.y);
+    if (dd < bestD) {
+      bestD = dd;
+      bestI = i;
+    }
+  });
+  z.pathIndex = bestI;
 }
 
 function updateDoors(s: GameState, dtMs: number): void {
@@ -1575,11 +1773,15 @@ function makeNoise(
   radius: number,
   holdMs: number,
   keepHolding: boolean,
-): void {
+): number {
+  let turned = 0;
   for (const z of s.zombies) {
     if (z.stallT > 0 && !keepHolding) continue;
+    // 도망치는 중이거나 미끄러져 누워 있으면 소리에 반응하지 않는다
+    if (z.state === "flee" || (z.stallT > 0 && z.daze !== "none")) continue;
     const d = dist(z.x, z.y, x, y);
     if (d > radius) continue;
+    turned++;
     const ms = z.kind === "matron" && !keepHolding ? s.tune.matron.distractMs : holdMs;
     if (keepHolding) {
       // 알람시계 — 시계 쪽으로 와서 울리는 내내 붙잡힌다
@@ -1599,6 +1801,7 @@ function makeNoise(
     z.repathT = 0;
     z.nearArmed = false;
   }
+  return turned;
 }
 
 // --- 좀비 ------------------------------------------------------------------
@@ -1614,9 +1817,11 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
 
     if (z.stallT > 0) {
       z.stallT -= dtMs;
-      yawnTimer(s, z, dtMs, true);
+      if (z.daze === "none") yawnTimer(s, z, dtMs, true);
+      else if (z.stallT <= 0) z.daze = "none";
       continue;
     }
+    z.daze = "none";
 
     // 감지
     let noticeR = z.noticeR;
@@ -1712,6 +1917,19 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
         }
         break;
       }
+      case "flee": {
+        // 폭죽에 놀라 반대쪽으로 냅다 뛴다 — 그동안은 아무것도 못 본다
+        z.t -= dtMs;
+        if (z.goal) steerTo(s, z, z.goal.x, z.goal.y, z.chaseSpeed * 1.1, dt, dtMs);
+        if (z.t <= 0 || (z.goal && dist(z.x, z.y, z.goal.x, z.goal.y) < 12)) {
+          z.state = "patrol";
+          z.goal = null;
+          z.stallT = POPPER.dizzyMs;
+          z.daze = "dizzy";
+          resnapPatrol(z);
+        }
+        break;
+      }
       default:
         break;
     }
@@ -1728,7 +1946,13 @@ function updateZombies(s: GameState, dt: number, dtMs: number): void {
     }
 
     // 잡힘 (환풍구에서 막 나온 0.6초 동안은 잡히지 않는다)
-    if (!hidden && s.phase === "playing" && s.ventGrace <= 0 && dp < s.tune.catchDist) {
+    if (
+      !hidden &&
+      z.state !== "flee" &&
+      s.phase === "playing" &&
+      s.ventGrace <= 0 &&
+      dp < s.tune.catchDist
+    ) {
       caught(s, z.kind === "matron" ? "matron" : hasFollower(s) ? "buddy" : "pillow");
     }
   }
@@ -1904,6 +2128,66 @@ function wakeFriend(s: GameState, f: Friend): void {
     });
   }
   spawnSparks(s, f.x, f.y, "#7FD4FF", 12);
+  if (s.stageId === 4) {
+    const awake = s.friends.filter((x) => x.state === "follow").length;
+    s.floaters.push({
+      x: s.player.x,
+      y: s.player.y - 30,
+      text: awake >= 4 ? `★ ${GOAL_DONE}` : `★ 친구 ${awake}/4`,
+      color: "#FFD34D",
+      life: 1300,
+    });
+  }
+}
+
+/**
+ * 세 번째 별 도전 진행 (§16). 스테이지 4는 친구 수를 매 순간 보므로 여기로 안 온다.
+ * 진행 중엔 `★ n/need`, 달성하면 `★ 목표 달성!` — 아이가 목표를 쫓다가 잊지 않게 한다.
+ */
+function bumpChallenge(s: GameState, n: number): void {
+  if (s.challengeDone || s.phase !== "playing") return;
+  const need = s.stage.challenge.need;
+  s.challenge = Math.min(need, s.challenge + n);
+  const done = s.challenge >= need;
+  if (done) {
+    s.challengeDone = true;
+    playSfx("starPop");
+  }
+  s.floaters.push({
+    x: s.player.x,
+    y: s.player.y - 30,
+    text: done ? `★ ${GOAL_DONE}` : `★ ${s.challenge}/${need}`,
+    color: "#FFD34D",
+    life: 1300,
+  });
+}
+
+/** 오늘의 할 일 3개 — 별 하나에 목표 하나 (§16) */
+export function goalsOf(s: GameState): GoalView[] {
+  const [a, b] = s.stage.ingredients;
+  const got = [a, b].filter((i) => s.gotIngredients[i]).length;
+  const menus = s.stage.menuPieces.filter((i) => s.gotMenus[i]).length;
+  const menuNeed = s.stage.menuPieces.length;
+  const main: GoalView =
+    s.stageId === 5
+      ? { text: GOAL_MAIN_5, done: s.phase === "stageClear", now: s.exitOpen ? 1 : 0, need: 2 }
+      : { text: GOAL_MAIN, done: s.phase === "stageClear", now: got, need: 2 };
+  if (s.stageId === 5 && s.phase === "stageClear") main.now = 2;
+  const menu: GoalView = { text: GOAL_MENU, done: menus >= menuNeed, now: menus, need: menuNeed };
+  let ch: GoalView;
+  if (s.stageId === 4) {
+    const awake = s.friends.filter((f) => f.state === "follow").length;
+    // 친구가 다시 잠들면 꺼질 수 있다 — 그게 사실이니 그대로 보여 준다
+    ch = { text: s.stage.challenge.text, done: awake >= 4, now: awake, need: 4 };
+  } else {
+    ch = {
+      text: s.stage.challenge.text,
+      done: s.challengeDone,
+      now: s.challenge,
+      need: s.stage.challenge.need,
+    };
+  }
+  return [main, menu, ch];
 }
 
 function updateFriends(s: GameState, dt: number, dtMs: number): void {
@@ -1969,6 +2253,11 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
   const p = s.player;
   const dp = dist(b.x, b.y, p.x, p.y);
   b.t += dtMs;
+  if (b.slipT > 0) {
+    // 바나나에 미끄러져 누워 있다 — 완전 무해
+    b.slipT -= dtMs;
+    return;
+  }
 
   switch (b.phase) {
     case "walk":
@@ -1994,6 +2283,8 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
       break;
     case "speech": {
       b.radius = s.tune.bossSleepR * Math.min(1, b.t / BOSS.expandMs);
+      // 연설 반경 언저리까지 들어와서(기둥 뒤든 뭐든) 안 잡히고 버티면 「연설 통과」 (§16)
+      if (s.phase === "playing" && p.hiding < 0 && dp < s.tune.bossSleepR + 20) b.passArmed = true;
       if (Math.floor((b.t - dtMs) / 420) !== Math.floor(b.t / 420)) playSpeechSyllable();
       // 눈을 감고 있어 몸통 충돌은 꺼진다. 벽·기둥에 막히면 안전하다.
       if (
@@ -2010,6 +2301,8 @@ function updateBoss(s: GameState, dt: number, dtMs: number): void {
         b.radius = 0;
         playSfx("bossCough");
         setRadio(s, BOSS_COUGH);
+        if (b.passArmed && s.phase === "playing") bumpChallenge(s, 1);
+        b.passArmed = false;
       }
       break;
     }
@@ -2088,8 +2381,12 @@ export function restartFromCheckpoint(s: GameState): void {
   s.player.chalkCd = 0;
   s.player.lockerCd.clear();
   s.player.alarms = Math.max(s.player.alarms, s.tune.startAlarms);
+  s.player.poppers = Math.max(s.player.poppers, s.tune.startPoppers);
+  s.player.bananas = Math.max(s.player.bananas, s.tune.startBananas);
   s.chalks.length = 0;
   s.alarms.length = 0;
+  s.poppers.length = 0;
+  s.bananas.length = 0;
   s.ventT = 0;
   s.ventFrom = -1;
   s.ventCd = 0;
@@ -2120,6 +2417,8 @@ export function restartFromCheckpoint(s: GameState): void {
     s.boss.phase = "walk";
     s.boss.t = 0;
     s.boss.radius = 0;
+    s.boss.passArmed = false;
+    s.boss.slipT = 0;
   }
   s.camera.x = s.player.x - VIEW_W / s.stage.renderScale / 2;
   s.camera.y = s.player.y - VIEW_H / s.stage.renderScale / 2;
@@ -2149,9 +2448,11 @@ function finishStage(s: GameState): void {
   // 스테이지 5에 따라 들어온 친구에게는 점수를 다시 주지 않는다
   const friendScore = s.friendScore;
 
-  let stars = 1;
-  if (allIngredients && allMenus) stars = 2;
-  if (stars === 2 && s.sleeps === 0 && friendsOk) stars = 3;
+  // 별 하나에 목표 하나 (§16): ★ 클리어 / ★ 급식표 / ★ 이 스테이지의 도전.
+  // 「안 자기」는 더 이상 별 조건이 아니다 — 점수 보너스(쌩쌩해요!)로만 남는다.
+  const challengeOk = s.stageId === 4 ? friendsOk : s.challengeDone;
+  const goals = [true, allIngredients && allMenus, challengeOk];
+  const stars = goals.filter(Boolean).length;
 
   const board: StageScore = {
     ingredients: ingredientScore,
@@ -2164,6 +2465,7 @@ function finishStage(s: GameState): void {
     nearMiss: s.nearMissScore,
     total: 0,
     stars,
+    goals,
   };
   board.total =
     board.ingredients +
@@ -2201,6 +2503,28 @@ function spawnSparks(s: GameState, x: number, y: number, color: string, n: numbe
   }
 }
 
+const CONFETTI_COLORS = ["#FF7BA9", "#FFD34D", "#7FD4FF", "#A6D96A", "#C6A6E8", "#FFFFFF"];
+
+/** 색종이 — 위로 튀어 올라 팔랑팔랑 떨어진다 */
+function spawnConfetti(s: GameState, x: number, y: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+    const v = 90 + Math.random() * 140;
+    s.particles.push({
+      x,
+      y,
+      vx: Math.cos(a) * v,
+      vy: Math.sin(a) * v,
+      life: 900 + Math.random() * 500,
+      maxLife: 1400,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size: 3 + Math.random() * 3,
+      kind: "confetti",
+      rot: Math.random() * Math.PI * 2,
+    });
+  }
+}
+
 function spawnZzz(s: GameState, x: number, y: number): void {
   for (let i = 0; i < 3; i++) {
     s.particles.push({
@@ -2228,6 +2552,14 @@ function updateParticles(s: GameState, dt: number): void {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     if (p.kind === "spark") p.vy += 220 * dt;
+    if (p.kind === "confetti") {
+      // 팔랑팔랑 — 느리게 떨어지며 좌우로 흔들리고 돈다
+      p.vy += 90 * dt;
+      p.vy = Math.min(p.vy, 70);
+      p.vx *= 1 - 2.2 * dt;
+      p.x += Math.sin(p.life * 0.012) * 18 * dt;
+      p.rot = (p.rot ?? 0) + dt * 6;
+    }
   }
 }
 
@@ -2258,10 +2590,14 @@ export function toHud(s: GameState): HudState {
     menus: s.gotMenus.filter(Boolean).length,
     ingredients: s.gotIngredients.slice(),
     alarms: s.player.alarms,
+    poppers: s.player.poppers,
+    bananas: s.player.bananas,
     torch: s.player.torchOn,
     canTorch: s.stageId >= 3 && inDark,
     canChalk: s.stageId >= 2,
     canAlarm: s.stageId >= 3,
+    canPopper: s.stageId >= 4 && s.player.poppers > 0,
+    canBanana: s.stageId >= 3 && s.player.bananas > 0,
     sleepLine: s.sleepLine,
     canSkip: s.phase === "sleeping" && s.sleepT > SKIP_AFTER_MS,
     showRestart: s.phase === "sleeping" && s.sleepT >= GAMEOVER_MS,
@@ -2271,6 +2607,7 @@ export function toHud(s: GameState): HudState {
     scoreBoard: s.score_,
     sleeps: s.sleeps,
     stageId: s.stageId,
+    goals: goalsOf(s),
     hasIngredientA: s.gotIngredients[stageIngredients[0]],
     hasIngredientB: s.gotIngredients[stageIngredients[1]],
     inDark,

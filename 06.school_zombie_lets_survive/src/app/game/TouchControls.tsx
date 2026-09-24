@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   drawAlarmIcon,
+  drawBananaIcon,
   drawChalkIcon,
   drawHandIcon,
+  drawPopperIcon,
   drawTorchIcon,
 } from "./sprites";
 import SpriteCanvas from "./SpriteCanvas";
@@ -15,6 +17,9 @@ import SpriteCanvas from "./SpriteCanvas";
  * 전부 `pointerdown`으로 처리한다 — `click`은 한 박자 늦어 연타가 씹힌다.
  * 390×844 세로에서 오른쪽 버튼이 전부 엄지 반경(아래에서 20~200px,
  * 오른쪽 끝에서 16~180px) 안에 들어오게 배치했다.
+ *
+ * 소모품(알람시계·폭죽·바나나)은 **손에 하나라도 있을 때만** 버튼이 뜨고,
+ * 뜬 것들만 둘째 줄에 오른쪽부터 차례로 늘어선다 — 버튼이 여섯 개로 불어나는 걸 막는다.
  */
 
 const JOY_R = 56;
@@ -26,11 +31,17 @@ interface Props {
   onInteractUp: () => void;
   onChalk: () => void;
   onAlarm: () => void;
+  onPopper: () => void;
+  onBanana: () => void;
   onTorch: () => void;
   showChalk: boolean;
   showAlarm: boolean;
+  showPopper: boolean;
+  showBanana: boolean;
   showTorch: boolean;
   alarms: number;
+  poppers: number;
+  bananas: number;
   torchOn: boolean;
   disabled: boolean;
 }
@@ -41,11 +52,17 @@ export default function TouchControls({
   onInteractUp,
   onChalk,
   onAlarm,
+  onPopper,
+  onBanana,
   onTorch,
   showChalk,
   showAlarm,
+  showPopper,
+  showBanana,
   showTorch,
   alarms,
+  poppers,
+  bananas,
   torchOn,
   disabled,
 }: Props) {
@@ -209,21 +226,53 @@ export default function TouchControls({
         btn("분필 던지기", 68, { right: 112, bottom: 26 }, onChalk, (ctx, w) =>
           drawChalkIcon(ctx, w / 2, w / 2, w * 0.7),
         )}
-      {showAlarm &&
-        btn(
-          "알람시계 놓기",
-          68,
-          { right: 24, bottom: 118 },
-          onAlarm,
-          (ctx, w) => drawAlarmIcon(ctx, w / 2, w / 2, w * 0.72),
-          undefined,
-          alarms,
-        )}
+      {/* 둘째 줄 — 가진 소모품만, 오른쪽부터 */}
+      {(
+        [
+          showAlarm && {
+            label: "알람시계 놓기",
+            onDown: onAlarm,
+            icon: drawAlarmIcon,
+            iconK: 0.72,
+            badge: alarms,
+          },
+          showPopper && {
+            label: "폭죽 던지기",
+            onDown: onPopper,
+            icon: drawPopperIcon,
+            iconK: 0.78,
+            badge: poppers,
+          },
+          showBanana && {
+            label: "바나나 껍질 놓기",
+            onDown: onBanana,
+            icon: drawBananaIcon,
+            iconK: 0.8,
+            badge: bananas,
+          },
+        ] as const
+      )
+        .filter((b): b is Exclude<typeof b, false> => !!b)
+        .map((b, i) => (
+          // key가 없으면 알람이 0개가 돼 사라질 때 폭죽 버튼이 그 자리로 밀려오며 아이콘이 안 바뀐다
+          <Fragment key={b.label}>
+            {btn(
+              b.label,
+              64,
+              { right: 24 + i * 74, bottom: 118 },
+              b.onDown,
+              (ctx, w) => b.icon(ctx, w / 2, w / 2, w * b.iconK),
+              undefined,
+              b.badge,
+            )}
+          </Fragment>
+        ))}
+      {/* 손전등은 켜고 끄는 스위치라 조금 멀어도 된다 — 셋째 줄 */}
       {showTorch &&
         btn(
           "손전등",
-          60,
-          { right: 108, bottom: 108 },
+          56,
+          { right: 28, bottom: 194 },
           onTorch,
           (ctx, w) => drawTorchIcon(ctx, w / 2, w / 2, w * 0.74),
           undefined,

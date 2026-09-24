@@ -1620,9 +1620,159 @@ export function drawAlarmOnGround(
   ctx.restore();
 }
 
+/** 파티 폭죽 — 색 띠가 감긴 고깔 + 끈. 날아갈 때 돈다 */
+export function drawPopper(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  spin: number,
+  size = 1,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(spin);
+  ctx.scale(size, size);
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  // 고깔
+  ctx.fillStyle = "#FF7BA9";
+  ctx.beginPath();
+  ctx.moveTo(-9, -5);
+  ctx.lineTo(9, 0);
+  ctx.lineTo(-9, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // 노란 띠
+  ctx.fillStyle = "#FFD34D";
+  ctx.beginPath();
+  ctx.moveTo(-3, -3.4);
+  ctx.lineTo(1, -2.3);
+  ctx.lineTo(1, 2.3);
+  ctx.lineTo(-3, 3.4);
+  ctx.closePath();
+  ctx.fill();
+  // 끈
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-9, 0);
+  ctx.quadraticCurveTo(-13, -3, -15, 1);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * 바닥에 놓인 바나나 껍질 — 만화에서 보던 그 모양.
+ * 가운데 흰 속살 덩이에서 노란 껍질 세 장이 축 늘어져 벌어지고, 한 장은 위로 서 있다.
+ */
+export function drawBanana(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size = 1,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size, size);
+  shadow(ctx, 0, 7, 13);
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = "round";
+  // 껍질 세 장 — [각도, 길이, 휘어짐]. 아래 두 장은 바닥에 늘어지고 위 한 장은 서 있다
+  const flaps: [number, number, number][] = [
+    [Math.PI * 0.82, 15, 5],
+    [Math.PI * 0.2, 15, -5],
+    [-Math.PI * 0.5, 13, 4],
+  ];
+  for (const [a, len, bend] of flaps) {
+    ctx.save();
+    ctx.rotate(a);
+    ctx.fillStyle = "#FFE45C";
+    ctx.beginPath();
+    ctx.moveTo(0, -4.2);
+    ctx.quadraticCurveTo(len * 0.55, -4.6 + bend * 0.3, len, bend * 0.4);
+    ctx.quadraticCurveTo(len * 0.55, 4.6 + bend * 0.3, 0, 4.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // 껍질 안쪽 연한 줄
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(2, 0);
+    ctx.quadraticCurveTo(len * 0.5, bend * 0.25, len * 0.85, bend * 0.36);
+    ctx.stroke();
+    // 갈색 끝
+    ctx.fillStyle = "#7A5230";
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(len, bend * 0.4, 1.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 가운데 속살 — 바나나였다는 흔적
+  ctx.fillStyle = "#FFF7D6";
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(0, 0.5, 5.2, 4.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** 머리 위에서 뱅뱅 도는 별 3개 — 폭죽에 놀랐거나 바나나에 미끄러진 좀비 */
+export function drawDizzyStars(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  time: number,
+): void {
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    const a = time * 0.006 + (i * Math.PI * 2) / 3;
+    const sx = x + Math.cos(a) * r * 1.1;
+    const sy = y - r * 1.35 + Math.sin(a) * r * 0.35;
+    ctx.fillStyle = "#FFD34D";
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let k = 0; k < 5; k++) {
+      const b = -Math.PI / 2 + (k * Math.PI * 2) / 5;
+      const c = b + Math.PI / 5;
+      ctx.lineTo(sx + Math.cos(b) * 4.5, sy + Math.sin(b) * 4.5);
+      ctx.lineTo(sx + Math.cos(c) * 2, sy + Math.sin(c) * 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // ---------------------------------------------------------------------------
 // 버튼 아이콘 — 이모지를 절대 쓰지 않는다 (기기마다 다르게 보이고 색도 못 바꾼다)
 // ---------------------------------------------------------------------------
+
+export function drawPopperIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  drawPopper(ctx, x + s * 0.04, y + s * 0.06, -0.7, s / 22);
+  // 터지는 색종이 점
+  const dots = ["#FFD34D", "#7FD4FF", "#A6D96A", "#FF7BA9"];
+  dots.forEach((c, i) => {
+    const a = -1.9 + i * 0.5;
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(a) * s * 0.42, y + Math.sin(a) * s * 0.42, s * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+export function drawBananaIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  drawBanana(ctx, x, y + s * 0.1, s / 32);
+}
 
 export function drawHandIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
   ctx.save();

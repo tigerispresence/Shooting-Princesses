@@ -5,8 +5,18 @@ import { playSfx } from "./audio";
 import { STAGES } from "./maps";
 import { drawMenuPiece, drawStar } from "./sprites";
 import SpriteCanvas from "./SpriteCanvas";
-import { MENU_ITEMS, MENU_MATRON, MENU_SCREEN_TITLE, fill } from "./text";
-import { recordFor } from "./storage";
+import {
+  GOAL_ALL,
+  GOAL_MAIN,
+  GOAL_MAIN_5,
+  GOAL_MENU,
+  GOAL_NEXT,
+  MENU_ITEMS,
+  MENU_MATRON,
+  MENU_SCREEN_TITLE,
+  fill,
+} from "./text";
+import { goalFlags, recordFor } from "./storage";
 import type { SaveData } from "./storage";
 import { DIFFICULTIES, DIFFICULTY_DESC, DIFFICULTY_LABEL } from "./difficulty";
 import type { Difficulty } from "./difficulty";
@@ -49,6 +59,14 @@ function boardFor(save: SaveData, stageId: number): BoardRow[] {
       diff: DIFFICULTY_LABEL[d],
     };
   });
+}
+
+/** 못 딴 별의 조건 한 줄 — 빈 별만 보여 주면 왜 비었는지 모른다 (§16) */
+function nextGoal(save: SaveData, stageId: number, challenge: string): string {
+  const texts = [stageId === 5 ? GOAL_MAIN_5 : GOAL_MAIN, GOAL_MENU, challenge];
+  const flags = goalFlags(save.goals[stageId - 1] ?? 0);
+  const idx = flags.findIndex((f) => !f);
+  return idx < 0 ? GOAL_ALL : `☆ ${GOAL_NEXT}: ${texts[idx]}`;
 }
 
 export default function StageSelect({
@@ -129,6 +147,11 @@ export default function StageSelect({
                     <p className="text-[11px] text-teal-200/80">
                       ◆ 환풍구 {st.vents.filter((v) => save.vents[v.id]).length}/
                       {st.vents.length}
+                    </p>
+                  )}
+                  {!locked && (
+                    <p className="truncate text-[11px] text-amber-200/85">
+                      {nextGoal(save, st.id, st.challenge.text)}
                     </p>
                   )}
                   {/* 이름별 기록 — 자매가 번갈아 하는 게 이 게임의 실제 사용 환경이다 */}

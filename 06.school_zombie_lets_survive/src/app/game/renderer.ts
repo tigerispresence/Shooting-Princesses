@@ -1,5 +1,6 @@
 import {
   ALARM,
+  POPPER,
   BOSS_R,
   CHALK,
   COLORS,
@@ -23,6 +24,9 @@ import { HIDE_AIM_EXIT_MS } from "./constants";
 import { hasLineOfSight, hideAimOpen } from "./engine";
 import {
   drawAlarmOnGround,
+  drawBanana,
+  drawDizzyStars,
+  drawPopper,
   drawBeakerTile,
   drawBoss,
   drawBroadcastDoorTile,
@@ -286,6 +290,50 @@ function drawWorld(
   }
   for (const a of s.alarms) if (!a.ringing) drawAlarmOnGround(ctx, a.x, a.y, false, t);
 
+  // 바나나 껍질 — 놓인 자리에 그대로. 놓는 순간 살짝 통 튀어 오른다
+  for (const b of s.bananas) {
+    const hop = b.t < 300 ? Math.sin((b.t / 300) * Math.PI) * 6 : 0;
+    drawBanana(ctx, b.x, b.y - hop);
+  }
+
+  // 파티 폭죽 — 날아가는 고깔 / 터진 뒤엔 「펑!」 + 놀라는 반경이 한 번 퍼진다
+  for (const c of s.poppers) {
+    if (!c.landed) {
+      drawPopper(ctx, c.x, c.y, c.spin);
+    } else {
+      const p = Math.min(1, c.t / 500);
+      ctx.save();
+      ctx.globalAlpha = 1 - p;
+      ctx.strokeStyle = "#FF7BA9";
+      ctx.lineWidth = 6 * (1 - p) + 2;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, POPPER.scareR * p, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "#FFD34D";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, POPPER.scareR * p * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      if (c.t < 700) {
+        const k = 1 + Math.min(1, c.t / 120) * 0.6;
+        ctx.save();
+        ctx.translate(c.x, c.y - 14);
+        ctx.scale(k, k);
+        ctx.rotate(-0.12);
+        ctx.fillStyle = "#FFD34D";
+        ctx.strokeStyle = COLORS.outline;
+        ctx.lineWidth = 3;
+        ctx.font = "900 16px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeText("펑!", 0, 0);
+        ctx.fillText("펑!", 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+
   // 분필
   for (const c of s.chalks) {
     if (!c.landed) {
@@ -326,8 +374,20 @@ function drawWorld(
       ctx.globalAlpha = near ? 1 : 0.85;
       drawMenuPiece(ctx, it.x, it.y, t + it.ph * 300);
       ctx.restore();
-    } else {
+    } else if (it.kind === "alarm") {
       drawIngredient(ctx, it.x, it.y, 3, t, TILE * 0.42);
+    } else {
+      // 폭죽·바나나 — 재료와 같은 따뜻한 노란 반짝임 위에 물건 그림
+      const bob = Math.sin((t + it.ph * 300) * 0.005) * 2;
+      const g = ctx.createRadialGradient(it.x, it.y, 0, it.x, it.y, 30);
+      g.addColorStop(0, "rgba(255,224,138,0.5)");
+      g.addColorStop(1, "rgba(255,224,138,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(it.x, it.y, 30, 0, Math.PI * 2);
+      ctx.fill();
+      if (it.kind === "popper") drawPopper(ctx, it.x, it.y - 4 + bob, -0.6, 1.1);
+      else drawBanana(ctx, it.x, it.y - 2 + bob, 0.95);
     }
   }
 
@@ -402,17 +462,34 @@ function drawWorld(
       chaseStartAt.delete(z);
       continue;
     }
+    const dazed = z.stallT > 0 && z.daze !== "none";
+    const slipped = dazed && z.daze === "slip";
+    ctx.save();
+    if (slipped) {
+      // 미끄러져 옆으로 누웠다 — 몸통을 90° 돌리고 바닥에 붙인다
+      ctx.translate(z.x, z.y + z.r * 0.55);
+      ctx.rotate((Math.PI / 2) * z.slipDir);
+      ctx.translate(-z.x, -z.y);
+    } else if (dazed) {
+      // 어리둥절 — 좌우로 크게 비틀거린다
+      ctx.translate(z.x, z.y);
+      ctx.rotate(Math.sin(t * 0.012) * 0.22);
+      ctx.translate(-z.x, -z.y);
+    }
     drawZombie(ctx, z.x, z.y, {
       kind: z.kind,
       r: z.r,
       bob: z.bob,
       state: z.state,
-      yawning: z.pauseT > 0 || z.stallT > 0,
+      yawning: !dazed && (z.pauseT > 0 || z.stallT > 0),
       variant: z.variant,
       phase: z.phase,
       amp: z.bobAmp,
     });
-    if (z.pauseT > 0 || z.stallT > 0) {
+    ctx.restore();
+    if (dazed) {
+      drawDizzyStars(ctx, z.x, z.y - (slipped ? z.r * 0.2 : 0), z.r, t);
+    } else if (z.pauseT > 0 || z.stallT > 0) {
       drawYawnBubble(ctx, z.x, z.y, z.r, t, z.kind === "basic" ? z.variant : 0);
     }
     if (z.state === "notice") {
@@ -429,7 +506,20 @@ function drawWorld(
     }
   }
 
-  if (boss?.active) drawBoss(ctx, boss.x, boss.y, BOSS_R, boss.phase, boss.bob);
+  if (boss?.active) {
+    if (boss.slipT > 0) {
+      // 교장 선생님이 바나나에 미끄러져 누웠다 — 넥타이가 하늘을 본다
+      ctx.save();
+      ctx.translate(boss.x, boss.y + BOSS_R * 0.5);
+      ctx.rotate(-Math.PI / 2);
+      ctx.translate(-boss.x, -boss.y);
+      drawBoss(ctx, boss.x, boss.y, BOSS_R, "recover", boss.bob);
+      ctx.restore();
+      drawDizzyStars(ctx, boss.x, boss.y - BOSS_R * 0.3, BOSS_R, t);
+    } else {
+      drawBoss(ctx, boss.x, boss.y, BOSS_R, boss.phase, boss.bob);
+    }
+  }
 
   // 주인공
   if (s.player.hiding < 0 || s.player.hideT > 0) {
@@ -466,6 +556,11 @@ function drawWorld(
       ctx.font = `bold ${p.size}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.fillText("z", p.x, p.y);
+    } else if (p.kind === "confetti") {
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot ?? 0);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size, -p.size * 0.55, p.size * 2, p.size * 1.1);
     } else {
       ctx.fillStyle = p.color;
       ctx.beginPath();

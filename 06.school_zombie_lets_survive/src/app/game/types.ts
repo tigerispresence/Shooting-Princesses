@@ -37,7 +37,9 @@ export type ZombieState =
   | "notice"
   | "chase"
   | "investigate"
-  | "stall";
+  | "stall"
+  /** 폭죽에 놀라 반대쪽으로 도망치는 중 */
+  | "flee";
 
 export interface Vec {
   x: number;
@@ -128,6 +130,8 @@ export interface StageDef {
   title: string;
   /** 타이틀 카드 부제 */
   subtitle: string;
+  /** 세 번째 별 — 이 스테이지만의 도전 (DESIGN §16). 쌓는 목표만 둔다, 실패가 확정되는 목표는 없다 */
+  challenge: { text: string; need: number };
   par: number;
   renderScale: number;
   patrolSpeed: number;
@@ -137,6 +141,10 @@ export interface StageDef {
   giveupMs: number;
   /** 시작할 때 손에 쥐고 있는 알람시계 */
   startAlarms: number;
+  /** 시작할 때 손에 쥐고 있는 파티 폭죽 */
+  startPoppers: number;
+  /** 시작할 때 손에 쥐고 있는 바나나 껍질 */
+  startBananas: number;
   rooms: RoomDef[];
   sections: SectionDef[];
   matronPaths: MatronPath[];
@@ -190,6 +198,8 @@ export interface Player {
   hideExits: number;
   torchOn: boolean;
   alarms: number;
+  poppers: number;
+  bananas: number;
   chalkCd: number;
   /** 사물함별 재진입 쿨다운 */
   lockerCd: Map<number, number>;
@@ -258,6 +268,13 @@ export interface Zombie {
   phase: number;
   /** 뒤뚱임 진폭 배율 (0.85~1.15) */
   bobAmp: number;
+  /**
+   * stall 중 어떤 꼴로 멈춰 있는가.
+   * "none" = 그냥 하품 / "dizzy" = 폭죽에 놀라 별이 뱅뱅 / "slip" = 바나나에 미끄러져 누움
+   */
+  daze: "none" | "dizzy" | "slip";
+  /** 미끄러진 방향 (누운 쪽) */
+  slipDir: 1 | -1;
 }
 
 export interface Friend {
@@ -295,7 +312,7 @@ export interface VentEnt {
 }
 
 export interface ItemEnt {
-  kind: "ingredient" | "menu" | "alarm";
+  kind: "ingredient" | "menu" | "alarm" | "popper" | "banana";
   /** ingredient면 0~7, menu면 0~9 */
   index: number;
   x: number;
@@ -326,6 +343,27 @@ export interface Alarm {
   done: boolean;
 }
 
+/** 던진 파티 폭죽 — 분필처럼 날아가서 착지하면 터진다 */
+export interface Popper {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  traveled: number;
+  landed: boolean;
+  /** 터진 뒤 연출 시간 */
+  t: number;
+  spin: number;
+}
+
+/** 바닥에 놓인 바나나 껍질 */
+export interface Banana {
+  x: number;
+  y: number;
+  /** 놓은 뒤 지난 시간 */
+  t: number;
+}
+
 export interface Door {
   /** 타일 인덱스 */
   tile: number;
@@ -347,6 +385,8 @@ export interface Boss {
   y: number;
   phase: BossPhase;
   t: number;
+  /** 이번 연설 동안 연설 반경 안까지 들어왔다 — recover로 넘어갈 때 「연설 통과」 1회로 센다 (§16) */
+  passArmed: boolean;
   /** 연설 반경 (0 → 200) */
   radius: number;
   line: string;
@@ -354,6 +394,8 @@ export interface Boss {
   active: boolean;
   bob: number;
   home: Vec;
+  /** 바나나에 미끄러져 누워 있는 남은 시간 */
+  slipT: number;
 }
 
 export interface Particle {
@@ -365,7 +407,9 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
-  kind: "spark" | "dust" | "zzz" | "star" | "heart";
+  kind: "spark" | "dust" | "zzz" | "star" | "heart" | "confetti";
+  /** confetti 전용 — 회전 */
+  rot?: number;
 }
 
 export interface Floater {
@@ -396,7 +440,17 @@ export interface StageScore {
   fresh: number;
   nearMiss: number;
   total: number;
+  /** 별 = 달성한 목표 수 (§16). goals[i]가 i번째 별 */
   stars: number;
+  goals: boolean[];
+}
+
+/** 화면에 보여 주는 목표 한 줄 (§16). 스테이지마다 정확히 3개 */
+export interface GoalView {
+  text: string;
+  done: boolean;
+  now: number;
+  need: number;
 }
 
 export interface GameState {
@@ -414,6 +468,8 @@ export interface GameState {
   items: ItemEnt[];
   chalks: Chalk[];
   alarms: Alarm[];
+  poppers: Popper[];
+  bananas: Banana[];
   doors: Door[];
   boss: Boss | null;
   particles: Particle[];
@@ -456,6 +512,9 @@ export interface GameState {
   /** 구역 이름 카드 */
   card: string | null;
   cardT: number;
+  /** 세 번째 별 도전의 진행도 (§16). 스테이지마다 세는 게 다르다 */
+  challenge: number;
+  challengeDone: boolean;
   /** 상호작용 대상 */
   target: InteractTarget | null;
   /** 맵 위의 환풍구 (쌍당 2개) */
@@ -547,10 +606,15 @@ export interface HudState {
   menus: number;
   ingredients: boolean[];
   alarms: number;
+  poppers: number;
+  bananas: number;
   torch: boolean;
   canTorch: boolean;
   canChalk: boolean;
   canAlarm: boolean;
+  /** 폭죽·바나나 버튼은 손에 하나라도 있을 때만 뜬다 — 버튼이 많아지는 걸 막는다 */
+  canPopper: boolean;
+  canBanana: boolean;
   sleepLine: string;
   canSkip: boolean;
   showRestart: boolean;
@@ -560,6 +624,8 @@ export interface HudState {
   scoreBoard: StageScore | null;
   sleeps: number;
   stageId: number;
+  /** 오늘의 할 일 3개 (§16) — 시작 카드·일시정지·지도·클리어에 같은 목록이 뜬다 */
+  goals: GoalView[];
   hasIngredientA: boolean;
   hasIngredientB: boolean;
   /** 찾은 환풍구 수 (전역 0~8) */

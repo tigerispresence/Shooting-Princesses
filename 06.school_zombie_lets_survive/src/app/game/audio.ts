@@ -35,6 +35,9 @@ export type SFX =
   | "menuComplete"
   | "stageStart"
   | "alarmSet"
+  | "popper"
+  | "slip"
+  | "bananaSet"
   | "exitOpen"
   | "ventOpen"
   | "ventCrawl"
@@ -519,6 +522,25 @@ export function playSfx(name: SFX): void {
     case "alarmSet":
       tone({ freq: 660, dur: 0.07, type: "square", gain: 0.12 });
       tone({ freq: 990, dur: 0.09, type: "square", gain: 0.1, delay: 0.07 });
+      break;
+    case "popper":
+      // 「펑!」 — 짧은 폭발 노이즈 + 아래로 떨어지는 음 + 반짝이 3음 (색종이)
+      noise({ dur: 0.18, gain: 0.16, cutoff: 3000, sweepTo: 300 });
+      tone({ freq: 420, to: 120, dur: 0.22, type: "square", gain: 0.12 });
+      [1567.98, 1975.53, 2349.32].forEach((f, i) =>
+        tone({ freq: f, dur: 0.14, type: "sine", gain: 0.07, delay: 0.12 + i * 0.07 }),
+      );
+      break;
+    case "slip":
+      // 「슈욱—」 위로 올라가는 휘슬 → 「철푸덕!」 둔탁한 노이즈
+      tone({ freq: 500, to: 1400, dur: 0.28, type: "sine", gain: 0.11 });
+      noise({ dur: 0.14, gain: 0.14, cutoff: 260, delay: 0.3 });
+      tone({ freq: 140, to: 70, dur: 0.16, type: "triangle", gain: 0.13, delay: 0.3 });
+      break;
+    case "bananaSet":
+      // 바닥에 살짝 놓는 물컹한 소리
+      tone({ freq: 260, to: 180, dur: 0.1, type: "triangle", gain: 0.09 });
+      noise({ dur: 0.06, gain: 0.04, cutoff: 700 });
       break;
     case "exitOpen":
       tone({ freq: 392, to: 784, dur: 0.4, type: "triangle", gain: 0.16 });

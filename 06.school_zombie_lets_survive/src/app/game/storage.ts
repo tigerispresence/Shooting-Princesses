@@ -31,6 +31,8 @@ export interface SaveData {
   look: Look;
   unlockedStage: number;
   stars: number[];
+  /** 스테이지별 달성한 목표 비트(1 클리어 / 2 급식표 / 4 도전). 별 = 켜진 비트 수 (DESIGN §16) */
+  goals: number[];
   best: number[];
   menuPieces: boolean[];
   friendsMet: boolean[];
@@ -56,6 +58,7 @@ export function emptySave(): SaveData {
     look: { hair: 0, cloth: 0, hat: null },
     unlockedStage: 1,
     stars: [0, 0, 0, 0, 0],
+    goals: [0, 0, 0, 0, 0],
     best: [0, 0, 0, 0, 0],
     menuPieces: new Array(10).fill(false),
     friendsMet: [false, false, false, false],
@@ -83,6 +86,7 @@ export function load(): SaveData {
       ...parsed,
       look: { ...base.look, ...(parsed.look ?? {}) },
       stars: fixArray(parsed.stars, 5, 0),
+      goals: migrateGoals(fixArray(parsed.goals, 5, 0), fixArray(parsed.stars, 5, 0)),
       best: fixArray(parsed.best, 5, 0),
       menuPieces: fixArray(parsed.menuPieces, 10, false),
       friendsMet: fixArray(parsed.friendsMet, 4, false),
@@ -186,4 +190,27 @@ export function refreshHats(data: SaveData): SaveData {
   if (data.vents.every(Boolean)) hats.add("janitor");
   data.unlockedHats = [...hats];
   return data;
+}
+
+/** 목표 비트 → 별 개수. 옛 세이브의 별은 그대로 존중한다(내려가지 않는다) */
+export function starsOf(goalBits: number, oldStars: number): number {
+  let n = 0;
+  for (let b = 0; b < 3; b++) if (goalBits & (1 << b)) n++;
+  return Math.max(n, oldStars);
+}
+
+/** 목표별 달성 여부 3칸 */
+export function goalFlags(goalBits: number): boolean[] {
+  return [0, 1, 2].map((b) => (goalBits & (1 << b)) !== 0);
+}
+
+/**
+ * §16 이전 세이브 이관: 별만 있고 목표 비트가 없으면 별에서 거꾸로 채운다.
+ * 옛 ★ = 클리어, ★★ = 급식표까지. 옛 ★★★(안 자기)은 새 도전과 다르므로 비트는 안 켜고 별 수만 지킨다.
+ */
+function migrateGoals(goals: number[], stars: number[]): number[] {
+  return goals.map((g, i) => {
+    if (g !== 0 || stars[i] <= 0) return g;
+    return stars[i] >= 2 ? 3 : 1;
+  });
 }

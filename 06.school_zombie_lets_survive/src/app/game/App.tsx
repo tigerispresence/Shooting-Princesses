@@ -17,6 +17,7 @@ import {
   recordsFor,
   refreshHats,
   save as writeSave,
+  starsOf,
 } from "./storage";
 import type { SaveData } from "./storage";
 import { RECORD_BEATEN } from "./text";
@@ -102,9 +103,13 @@ export default function App() {
         mine.bestTimeMs[i] > 0 ? Math.min(mine.bestTimeMs[i], r.timeMs) : r.timeMs;
       next.recentNames = [me, ...data.recentNames.filter((n) => n !== me)].slice(0, 4);
 
+      next.goals = [...data.goals];
+      next.goals[i] =
+        (next.goals[i] ?? 0) | r.goals.reduce((bits, ok, b) => (ok ? bits | (1 << b) : bits), 0);
       next.stars = [...data.stars];
       next.best = [...data.best];
-      next.stars[i] = Math.max(next.stars[i] ?? 0, r.stars);
+      // 별은 누적이다 — 급식표는 이번 판, 도전은 다음 판에 채워도 셋 다 켜진다 (§16)
+      next.stars[i] = starsOf(next.goals[i], next.stars[i] ?? 0);
       next.best[i] = Math.max(next.best[i] ?? 0, r.score);
       next.vents = data.vents.map((v, k) => v === true || r.foundVents[k] === true);
       next.menuPieces = r.menuPieces.slice();

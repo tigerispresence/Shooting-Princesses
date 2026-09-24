@@ -6,6 +6,8 @@ import { COLORS, MINIMAP_H, MINIMAP_W, VIEW_H, VIEW_W } from "./constants";
 import {
   createGame,
   placeAlarm,
+  placeBanana,
+  throwPopper,
   pressInteract,
   releaseInteract,
   restartFromCheckpoint,
@@ -20,6 +22,8 @@ import {
 import { INGREDIENTS, STAGES } from "./maps";
 import { playClearFanfare, playMusic, stopMusic } from "./music";
 import PauseMenu from "./PauseMenu";
+import GoalList from "./GoalList";
+import { GOAL_ALL, GOAL_NEXT, GOAL_TAP } from "./text";
 import { drawFullMap, drawStars, isDarkHere, render } from "./renderer";
 import * as sprites from "./sprites";
 import { drawIngredient, drawPauseIcon, drawSoundIcon } from "./sprites";
@@ -38,6 +42,8 @@ export interface ClearResult {
   friendsMet: boolean[];
   foundVents: boolean[];
   sleeps: number;
+  /** 달성한 목표 3칸 — 별 하나에 하나 (§16) */
+  goals: boolean[];
 }
 
 interface Props {
@@ -70,10 +76,14 @@ const EMPTY_HUD: HudState = {
   menus: 0,
   ingredients: new Array(8).fill(false),
   alarms: 0,
+  poppers: 0,
+  bananas: 0,
   torch: false,
   canTorch: false,
   canChalk: false,
   canAlarm: false,
+  canPopper: false,
+  canBanana: false,
   sleepLine: "",
   canSkip: false,
   showRestart: false,
@@ -91,6 +101,7 @@ const EMPTY_HUD: HudState = {
   timeMs: 0,
   difficulty: "normal",
   scoreMult: 1,
+  goals: [],
 };
 
 export default function GameCanvas({
@@ -118,6 +129,8 @@ export default function GameCanvas({
   const [hud, setHud] = useState<HudState>(EMPTY_HUD);
   const [paused, setPaused] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  // 오늘의 할 일 카드 — 시작 전에 한 번. 연습 모드엔 목표가 없다.
+  const [goalCard, setGoalCard] = useState(practice === null);
   const [rotate, setRotate] = useState(false);
   const [box, setBox] = useState({ w: 360, h: 480 });
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -248,15 +261,15 @@ export default function GameCanvas({
 
   useEffect(() => {
     withState((s) => {
-      s.paused = paused || rotate;
+      s.paused = paused || rotate || goalCard;
       s.mapOpen = mapOpen;
-      if (paused || rotate || mapOpen) {
+      if (paused || rotate || mapOpen || goalCard) {
         keysRef.current = { up: false, down: false, left: false, right: false };
         setMove(s, 0, 0);
         releaseInteract(s);
       }
     });
-  }, [paused, rotate, mapOpen, withState]);
+  }, [paused, rotate, mapOpen, goalCard, withState]);
 
   // 클리어
   useEffect(() => {
@@ -279,6 +292,7 @@ export default function GameCanvas({
       ),
       foundVents: s.foundVents.slice(),
       sleeps: s.sleeps,
+      goals: s.score_?.goals ?? [true, false, false],
     });
     // friendsMet은 게임을 만들 때 넘긴 값 그대로라 의존성에 넣을 필요가 없다
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -319,6 +333,13 @@ export default function GameCanvas({
       if (!s) return;
       if (e.repeat) return;
 
+      // 할 일 카드는 아무 키로 닫는다
+      if (goalCard) {
+        e.preventDefault();
+        setGoalCard(false);
+        playSfx("uiTap");
+        return;
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         setMapOpen(false);
@@ -361,9 +382,20 @@ export default function GameCanvas({
         throwChalk(s);
         return;
       }
-      if (e.key === "q" || e.key === "Q") {
+      if (e.key === "q" || e.key === "Q" || e.key === "1") {
         e.preventDefault();
         placeAlarm(s);
+        return;
+      }
+      if (e.key === "r" || e.key === "R" || e.key === "2") {
+        e.preventDefault();
+        setAim(s, null);
+        throwPopper(s);
+        return;
+      }
+      if (e.key === "c" || e.key === "C" || e.key === "3") {
+        e.preventDefault();
+        placeBanana(s);
         return;
       }
       if (e.key === "f" || e.key === "F") {
@@ -400,7 +432,7 @@ export default function GameCanvas({
       window.removeEventListener("blur", onBlur);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paused, mapOpen]);
+  }, [paused, mapOpen, goalCard]);
 
   // 마우스로 분필 던지기 — 커서 방향
   const aimFromEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -522,9 +554,10 @@ export default function GameCanvas({
             }}
           />
 
-          {/* 미니맵을 탭하면 전체 지도 + 일시정지 */}
+          {/* 미니맵을 탭하면 전체 지도 + 일시정지.
+              z-10: 폰에서 조이스틱 캡처 영역(왼쪽 55%, 전체 높이)이 이 위를 덮어 탭이 먹히지 않았다 */}
           <button
-            className="absolute touch-none select-none"
+            className="absolute z-10 touch-none select-none"
             style={{
               left: 0,
               top: 0,
@@ -575,7 +608,7 @@ export default function GameCanvas({
           })}
         </div>
 
-        {!paused && !rotate && !mapOpen && hud.phase === "playing" && (
+        {!paused && !rotate && !mapOpen && !goalCard && hud.phase === "playing" && (
           <div
             className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2"
             style={{ width: box.w }}
@@ -591,11 +624,17 @@ export default function GameCanvas({
               onInteractUp={() => withState((s) => releaseInteract(s))}
               onChalk={() => withState((s) => throwChalk(s))}
               onAlarm={() => withState((s) => placeAlarm(s))}
+              onPopper={() => withState((s) => throwPopper(s))}
+              onBanana={() => withState((s) => placeBanana(s))}
               onTorch={() => withState((s) => toggleTorch(s))}
               showChalk={hud.canChalk}
               showAlarm={hud.canAlarm}
+              showPopper={hud.canPopper}
+              showBanana={hud.canBanana}
               showTorch={hud.canTorch}
               alarms={hud.alarms}
+              poppers={hud.poppers}
+              bananas={hud.bananas}
               torchOn={hud.torch}
               disabled={hud.phase !== "playing"}
             />
@@ -638,6 +677,9 @@ export default function GameCanvas({
                 if (s) drawFullMap(ctx, s, w, h);
               }}
             />
+            <div className="w-full max-w-[330px]">
+              <GoalList goals={hud.goals} compact />
+            </div>
             <button
               className="rounded-2xl border-2 border-amber-200/60 bg-amber-300/30 px-8 py-3 text-base
                          font-bold text-amber-100 touch-none select-none active:bg-amber-300/50"
@@ -659,6 +701,7 @@ export default function GameCanvas({
             onBgm={onBgm}
             onSfx={onSfx}
             sectionLabel={hud.section}
+            goals={hud.goals}
             onResume={() => {
               playSfx("uiTap");
               setPaused(false);
@@ -672,6 +715,27 @@ export default function GameCanvas({
               onExit();
             }}
           />
+        )}
+
+        {/* 오늘의 할 일 — 시작 전 카드. 아무 데나 눌러서 닫는다 (§16) */}
+        {goalCard && !rotate && (
+          <div
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#151129]/92 p-6 text-center touch-none select-none"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              playSfx("uiTap");
+              setGoalCard(false);
+            }}
+          >
+            <h2 className="text-2xl font-extrabold text-amber-200">{stage.title}</h2>
+            <p className="text-sm text-violet-200/80">{stage.subtitle}</p>
+            <div className="mt-1 w-full max-w-[320px] rounded-2xl border border-amber-200/30 bg-white/5 p-3">
+              <GoalList goals={hud.goals} />
+            </div>
+            <p className="mt-2 rounded-2xl border-2 border-amber-200/60 bg-amber-300/30 px-8 py-3 text-lg font-bold text-amber-100 bell-pop">
+              {GOAL_TAP}
+            </p>
+          </div>
         )}
 
         {rotate && (
@@ -693,6 +757,16 @@ export default function GameCanvas({
                 drawStars(ctx, w, h, clearBoard.stars, performance.now() - clearTimeRef.current)
               }
             />
+            <div className="w-full max-w-[300px]">
+              <GoalList goals={hud.goals} title={false} compact />
+              {hud.goals.every((g) => g.done) ? (
+                <p className="pt-1 text-center text-sm font-extrabold text-amber-200">{GOAL_ALL}</p>
+              ) : (
+                <p className="pt-1 text-center text-[12px] text-violet-300/80">
+                  {GOAL_NEXT}: {hud.goals.find((g) => !g.done)?.text}
+                </p>
+              )}
+            </div>
             <div className="w-full max-w-[300px] space-y-1 text-[13px] text-violet-100">
               <Row label="재료" value={clearBoard.ingredients} />
               <Row label="급식표" value={clearBoard.menus} />

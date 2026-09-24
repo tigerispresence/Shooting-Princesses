@@ -1,4 +1,4 @@
-import { ALARM, BOSS, CHALK, DARK_VIEW_R, MATRON, TORCH_NOTICE_MULT } from "./constants";
+import { ALARM, BANANA, BOSS, CHALK, DARK_VIEW_R, MATRON, POPPER, TORCH_NOTICE_MULT } from "./constants";
 import type { StageDef } from "./types";
 
 /**
@@ -60,6 +60,10 @@ export interface Tuning {
   broadcastHold: number;
   alarmMax: number;
   startAlarms: number;
+  popperMax: number;
+  startPoppers: number;
+  bananaMax: number;
+  startBananas: number;
   chalkCd: number;
   /** 다온이 따라올 때의 분필 쿨다운 (같은 비율로 줄인다) */
   chalkCdFast: number;
@@ -112,6 +116,10 @@ export function makeTuning(diff: Difficulty, stage: StageDef): Tuning {
     broadcastHold: 3000,
     alarmMax: ALARM.max,
     startAlarms: stage.startAlarms,
+    popperMax: POPPER.max,
+    startPoppers: stage.startPoppers,
+    bananaMax: BANANA.max,
+    startBananas: stage.startBananas,
     chalkCd: CHALK.cd,
     chalkCdFast: 700,
     darkViewR: DARK_VIEW_R,
@@ -145,6 +153,11 @@ export function makeTuning(diff: Difficulty, stage: StageDef): Tuning {
       alarmMax: 5,
       // 알람을 못 쓰는 스테이지(1·2)에는 그대로 0을 둔다
       startAlarms: stage.startAlarms === 0 ? 0 : Math.min(5, stage.startAlarms + 2),
+      // 폭죽·바나나도 같은 원칙 — 아직 못 쓰는 스테이지에는 0을 둔다
+      popperMax: 4,
+      startPoppers: stage.startPoppers === 0 ? 0 : Math.min(4, stage.startPoppers + 1),
+      bananaMax: 4,
+      startBananas: stage.startBananas === 0 ? 0 : Math.min(4, stage.startBananas + 1),
       chalkCd: 800,
       chalkCdFast: Math.round((800 * 700) / 1200),
       darkViewR: 210,
@@ -174,6 +187,10 @@ export function makeTuning(diff: Difficulty, stage: StageDef): Tuning {
     broadcastHold: 3500,
     alarmMax: 2,
     startAlarms: stage.startAlarms === 0 ? 0 : Math.max(1, stage.startAlarms - 1),
+    popperMax: 2,
+    startPoppers: stage.startPoppers === 0 ? 0 : Math.max(1, stage.startPoppers - 1),
+    bananaMax: 2,
+    startBananas: stage.startBananas === 0 ? 0 : Math.max(1, stage.startBananas - 1),
     chalkCd: 1500,
     chalkCdFast: Math.round((1500 * 700) / 1200),
     darkViewR: 120,
