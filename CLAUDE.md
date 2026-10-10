@@ -13,6 +13,7 @@ Web games built for two 10-year-old girls. One directory per game, one git repo 
 | `04.escape_room` | live; Next.js 16; top-down escape room, 5 puzzle rooms per stage (stage 1 「달빛 성」 done) |
 | `05.Karaoke` | built, not yet deployed; Next.js 16; home karaoke — text notation (도레미) → synth melody + auto accompaniment, syllable-fill lyrics, mic pitch scoring. Ships with zero copyrighted content: songs are typed in by the kids and live in localStorage only |
 | `06.school_zombie_lets_survive` | live at https://06schoolzombieletssurvive.vercel.app; Next.js 16; Among Us 느낌 탑다운, 초등학교 배경 「졸음 좀비」 회피, 5스테이지 15구역, 자유 8방향 이동. 스펙·리뷰는 `docs/` (DESIGN.md v0.4, BUILD_NOTES.md) |
+| `07.한글타자게임` | built, not yet deployed; Next.js 16; 「타닥타닥 타자교실」 — 한메타자 스타일 두벌식 타자 연습. **데스크톱 전용(모바일 미지원)**. 자체 두벌식 오토마타(`hangul.ts`, event.code 기반, OS IME 안 씀) + `npm test`. 자리연습 8단계·낱말·짧은 글·「사탕비 마을」 12단계, 꾸미기/스티커, localStorage `tadak.v1`. 스펙은 `docs/DESIGN.md` |
 
 Git: repo root is `~/Projects/03.games`, remote `origin`, branch `main`. Each game deploys separately to Vercel from its own directory.
 
